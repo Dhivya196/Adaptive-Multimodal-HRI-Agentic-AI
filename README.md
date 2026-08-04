@@ -173,26 +173,9 @@ Adaptive-Human-Robot-Communication/
 - ROS2 integration with physical robots
 - Edge deployment on NVIDIA Jetson/Raspberry Pi
 - Reinforcement learning for adaptive behaviour
-- Personalized interaction using long-term memory
+- Personalised interaction using long-term memory
 - Emotion-aware human-robot communication
 - Multi-robot collaboration
-
----
-
-## 📚 References
-
-The literature survey consists of **18 research papers**, including **12 papers published between 2023–2026**, covering:
-
-- Human-Robot Interaction (HRI)
-- Multimodal Communication
-- Agentic AI
-- Multi-Agent Systems
-- Computer Vision
-- Gesture Recognition
-- Safety-aware Robotics
-- Task Planning
-
-The complete bibliography is available in **papers/references.bib**.
 
 ---
 
@@ -200,7 +183,6 @@ The complete bibliography is available in **papers/references.bib**.
 
 **Project Title:** Adaptive Multimodal Human-Robot Communication Using a Multi-Agent AI Framework with Safety-Aware Decision Making
 
-Developed as part of the **Digital Assignment (DA1)** for the Artificial Intelligence / Robotics curriculum.
 
 ---
 

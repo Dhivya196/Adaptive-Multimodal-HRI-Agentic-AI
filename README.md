@@ -1,6 +1,6 @@
 # Adaptive Multimodal Human-Robot Communication Using a Multi-Agent AI Framework with Safety-Aware Decision Making
 
-> An Agentic AI framework that enables robots to understand human commands through speech, gestures, and vision while ensuring safe and explainable decision-making.
+> An Agentic AI framework that enables robots to understand human commands through speech, gestures, and vision while ensuring safe decision-making.
 
 ---
 
@@ -8,7 +8,7 @@
 
 Human-Robot Interaction (HRI) plays a vital role in enabling intuitive communication between humans and intelligent robotic systems. Most existing HRI systems rely on a single communication modality, such as speech or vision, making them vulnerable to noisy environments, ambiguous commands, and unsafe task execution.
 
-This project proposes a lightweight **Multi-Agent AI Framework** that combines multiple intelligent agents to understand human intentions using **speech recognition, gesture recognition, and computer vision**. Before executing any action, a dedicated **Safety Agent** evaluates the environment to prevent unsafe operations. Additional agents such as **Memory**, **Task Planner**, and **Explainability** improve contextual understanding, autonomous planning, and user trust.
+This project proposes a lightweight **Multi-Agent AI Framework** that combines multiple intelligent agents to understand human intentions using **speech recognition, gesture recognition, and computer vision**. Before executing any action, a dedicated **Safety Agent** evaluates the environment to prevent unsafe operations. Additional agents such as **Memory**, **Task Planner** and **Safety** improve contextual understanding, autonomous planning, and user trust.
 
 ---
 
@@ -21,7 +21,7 @@ This project proposes a lightweight **Multi-Agent AI Framework** that combines m
 - Develop a **Safety Agent** to evaluate environmental risks before execution.
 - Develop a **Memory Agent** to store user preferences and previous interactions.
 - Develop a **Task Planner Agent** for autonomous task decomposition and planning.
-- Develop an **Explainability Agent** to provide human-understandable reasoning for robot decisions.
+- Develop a **Safety Agent** for safe execution of instructions in a human-robot proximity environment
 - Compare multimodal interaction with voice-only interaction in terms of accuracy and safety.
 
 ---
@@ -49,9 +49,6 @@ This project proposes a lightweight **Multi-Agent AI Framework** that combines m
                         │                │
                         └──────┬─────────┘
                                ▼
-                    Explainability Agent
-                               │
-                               ▼
                       Robot Controller
                                │
                                ▼
@@ -71,7 +68,7 @@ This project proposes a lightweight **Multi-Agent AI Framework** that combines m
 |  Safety Agent | Validates whether the requested action is safe before execution. |
 |  Memory Agent | Stores previous commands, user preferences, and object locations. |
 |  Task Planner Agent | Generates an ordered sequence of actions required to complete the task. |
-|  Explainability Agent | Explains why the robot executed or rejected a command. |
+|  Safety Agent | Ensures that the execution would be safe. |
 
 ---
 
@@ -87,58 +84,6 @@ This project proposes a lightweight **Multi-Agent AI Framework** that combines m
 - CrewAI
 - Ollama / Llama 3
 - ROS2 (Future Integration)
-
----
-
-##  Repository Structure
-
-```
-Adaptive-Human-Robot-Communication/
-│
-├── README.md
-├── LICENSE
-├── .gitignore
-├── requirements.txt
-│
-├── docs/
-│   ├── DA1_Report.pdf
-│   ├── Project_Overview.pdf
-│   ├── Literature_Survey.pdf
-│   └── Architecture.png
-│
-├── datasets/
-│   ├── README.md
-│   ├── speech/
-│   ├── gesture/
-│   ├── vision/
-│   └── safety/
-│
-├── papers/
-│   ├── README.md
-│   └── references.bib
-│
-├── src/
-│   ├── voice_agent/
-│   ├── gesture_agent/
-│   ├── vision_agent/
-│   ├── coordinator_agent/
-│   ├── memory_agent/
-│   ├── task_planner/
-│   ├── safety_agent/
-│   ├── explainability_agent/
-│   └── utils/
-│
-├── models/
-│
-├── results/
-│
-├── images/
-│   ├── architecture.png
-│   └── workflow.png
-│
-└── presentation/
-    └── DA1_Presentation.pptx
-```
 
 ---
 

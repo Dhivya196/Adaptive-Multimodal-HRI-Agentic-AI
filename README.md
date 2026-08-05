@@ -4,7 +4,7 @@
 
 ---
 
-## 📖 Project Overview
+## Project Overview
 
 Human-Robot Interaction (HRI) plays a vital role in enabling intuitive communication between humans and intelligent robotic systems. Most existing HRI systems rely on a single communication modality, such as speech or vision, making them vulnerable to noisy environments, ambiguous commands, and unsafe task execution.
 
@@ -12,7 +12,7 @@ This project proposes a lightweight **Multi-Agent AI Framework** that combines m
 
 ---
 
-## 🎯 Objectives
+##  Objectives
 
 - Develop a **Voice Agent** for speech command recognition.
 - Develop a **Gesture Agent** for pointing and hand gesture recognition.
@@ -26,7 +26,7 @@ This project proposes a lightweight **Multi-Agent AI Framework** that combines m
 
 ---
 
-## 🏗️ Proposed Architecture
+##  Proposed Architecture
 
 ```
                    Human User
@@ -60,22 +60,22 @@ This project proposes a lightweight **Multi-Agent AI Framework** that combines m
 
 ---
 
-## 🤖 Multi-Agent Framework
+##  Multi-Agent Framework
 
 | Agent | Responsibility |
 |--------|----------------|
-| 🎤 Voice Agent | Converts speech into text and extracts user commands. |
-| ✋ Gesture Agent | Detects pointing direction and hand gestures. |
-| 👁️ Vision Agent | Detects objects, obstacles, and environmental context. |
-| 🧠 Coordinator Agent | Combines outputs from all perception agents to determine user intent. |
-| 🛡️ Safety Agent | Validates whether the requested action is safe before execution. |
-| 🧾 Memory Agent | Stores previous commands, user preferences, and object locations. |
-| 📋 Task Planner Agent | Generates an ordered sequence of actions required to complete the task. |
-| 💬 Explainability Agent | Explains why the robot executed or rejected a command. |
+|  Voice Agent | Converts speech into text and extracts user commands. |
+|  Gesture Agent | Detects pointing direction and hand gestures. |
+|  Vision Agent | Detects objects, obstacles, and environmental context. |
+|  Coordinator Agent | Combines outputs from all perception agents to determine user intent. |
+|  Safety Agent | Validates whether the requested action is safe before execution. |
+|  Memory Agent | Stores previous commands, user preferences, and object locations. |
+|  Task Planner Agent | Generates an ordered sequence of actions required to complete the task. |
+|  Explainability Agent | Explains why the robot executed or rejected a command. |
 
 ---
 
-## 🛠️ Technologies Used
+##  Technologies Used
 
 - Python
 - OpenCV
@@ -90,7 +90,7 @@ This project proposes a lightweight **Multi-Agent AI Framework** that combines m
 
 ---
 
-## 📂 Repository Structure
+##  Repository Structure
 
 ```
 Adaptive-Human-Robot-Communication/
@@ -142,7 +142,7 @@ Adaptive-Human-Robot-Communication/
 
 ---
 
-## 📊 Datasets
+##  Datasets
 
 | Module | Dataset |
 |--------|---------|
@@ -155,7 +155,7 @@ Adaptive-Human-Robot-Communication/
 
 ---
 
-## 📈 Evaluation Metrics
+##  Evaluation Metrics
 
 - Speech Recognition Accuracy
 - Gesture Recognition Accuracy
@@ -168,7 +168,7 @@ Adaptive-Human-Robot-Communication/
 
 ---
 
-## 🚀 Future Enhancements
+##  Future Enhancements
 
 - ROS2 integration with physical robots
 - Edge deployment on NVIDIA Jetson/Raspberry Pi
@@ -179,13 +179,6 @@ Adaptive-Human-Robot-Communication/
 
 ---
 
-## 👨‍💻 Team
-
-**Project Title:** Adaptive Multimodal Human-Robot Communication Using a Multi-Agent AI Framework with Safety-Aware Decision Making
-
-
----
-
-## 📄 License
+##  License
 
 This project is released under the MIT License.

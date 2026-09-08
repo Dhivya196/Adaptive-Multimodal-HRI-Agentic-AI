@@ -77,7 +77,7 @@ This project proposes a lightweight **Multi-Agent AI Framework** that combines m
 - Python
 - OpenCV
 - MediaPipe
-- YOLOv8
+- YOLO26n / YOLOv8
 - Whisper / Vosk (Speech Recognition)
 - LangChain
 - LangGraph
@@ -113,17 +113,45 @@ This project proposes a lightweight **Multi-Agent AI Framework** that combines m
 
 ---
 
-##  Future Enhancements
+## 📁 Project Structure
 
-- ROS2 integration with physical robots
-- Edge deployment on NVIDIA Jetson/Raspberry Pi
-- Reinforcement learning for adaptive behaviour
-- Personalised interaction using long-term memory
-- Emotion-aware human-robot communication
-- Multi-robot collaboration
+```text
+Adaptive-Multimodal-HRI-Agentic-AI/
+├── configs/                       # Configuration files (.yaml / .json)
+├── datasets/                      # Speech, gesture, and vision datasets
+│   ├── Gesture_dataset/
+│   └── Speech_commands/
+├── report/                        # Architecture reports and system design documents
+├── scripts/                       # Executable scripts and CLI utilities
+├── src/
+│   ├── agents/
+│   │   └── vision/                # Vision perception agent module
+│   ├── common/                    # Shared schemas, utilities, and exceptions
+│   ├── pipeline/                  # End-to-end multi-agent pipelines
+│   └── utils/                     # Device drivers, cameras, and helpers
+├── tests/                         # Unit and integration test suite
+├── .gitignore                     # Git ignore file
+├── requirements.txt               # Project dependencies
+└── README.md
+```
 
 ---
 
-##  License
+## 🔮 Future Roadmap
+
+- Vision Agent (YOLO26n object detection & spatial scene grounding)
+- Gesture Agent (YOLO Pose / MediaPipe body & hand gesture perception)
+- Voice Agent (Whisper Speech-to-Text)
+- Coordinator Agent (Multimodal LLM Intent Fusion)
+- Contextual Memory Agent (Vector embeddings & retrieval)
+- Task Planner Agent (Constrained robot action sequencing)
+- Safety Agent (Deterministic rules & LLM contextual risk assessment)
+- ROS2 Integration (Robot controller execution layer)
+
+---
+
+## 📄 License
 
 This project is released under the MIT License.
+
+

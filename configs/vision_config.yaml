@@ -1,0 +1,40 @@
+# Vision Agent Configuration for Adaptive Multimodal HRI
+vision:
+  model_name: "yolo26n.pt"          # Model weights (e.g. yolo26n.pt, yolov8n.pt)
+  device: "auto"                    # "cuda", "cpu", or "auto"
+  confidence_threshold: 0.45        # Minimum detection confidence
+  iou_threshold: 0.45               # NMS IoU threshold
+  target_classes:                   # Target objects relevant for HRI tasks
+    - "person"
+    - "bottle"
+    - "cup"
+    - "wine glass"
+    - "bowl"
+    - "banana"
+    - "apple"
+    - "sandwich"
+    - "orange"
+    - "chair"
+    - "couch"
+    - "dining table"
+    - "laptop"
+    - "cell phone"
+    - "book"
+
+camera:
+  device_id: 0                      # Camera index (0 for default webcam)
+  width: 640                        # Frame width
+  height: 480                       # Frame height
+  fps: 30                           # Target capture frame rate
+
+spatial:
+  sector_split: [0.33, 0.67]        # X-ratios dividing frame into [LEFT, CENTER, RIGHT]
+  near_area_ratio_threshold: 0.15   # Bbox area / Frame area > 0.15 is classified as 'near'
+  medium_area_ratio_threshold: 0.05 # 0.05 - 0.15 is 'medium', < 0.05 is 'far'
+
+visualizer:
+  enable_display: true              # Display OpenCV preview window
+  window_name: "HRI Multimodal Perception - Vision Agent"
+  show_spatial_sectors: true        # Draw vertical sector lines
+  show_labels: true                 # Draw object labels and confidence
+  show_summary_banner: true         # Draw top perception HUD banner

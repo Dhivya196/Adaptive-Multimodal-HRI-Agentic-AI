@@ -1,0 +1,18 @@
+# ==============================================================================
+# Adaptive Multimodal HRI Framework - Coordinator Configuration
+# ==============================================================================
+
+coordinator:
+  # Minimum confidence threshold (below this, marked as LOW_CONFIDENCE)
+  min_confidence_threshold: 0.40
+
+  # Whether targets requested by voice must be confirmed by visual perception
+  require_visual_target_confirmation: true
+
+  # Modality fusion weights
+  voice_weight: 0.55
+  vision_weight: 0.35
+  gesture_weight: 0.10
+
+  # Logging verbosity
+  log_level: "INFO"

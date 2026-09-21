@@ -1,0 +1,24 @@
+# ==============================================================================
+# Adaptive Multimodal HRI Framework - Task Planner Configuration
+# ==============================================================================
+
+planner:
+  supported_tasks:
+    - "stop_robot"
+    - "navigate_to"
+    - "pick_and_place"
+    - "inspect_object"
+    
+  max_plan_steps: 10
+  default_timeout: 15.0
+  
+  step_timeouts:
+    MOVE: 15.0
+    MOVE_FORWARD: 15.0
+    MOVE_BACKWARD: 15.0
+    TURN_LEFT: 5.0
+    TURN_RIGHT: 5.0
+    STOP: 2.0
+    PICK: 10.0
+    PLACE: 10.0
+    INSPECT: 5.0

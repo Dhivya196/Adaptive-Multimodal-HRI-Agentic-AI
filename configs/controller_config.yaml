@@ -1,0 +1,20 @@
+# ==============================================================================
+# Adaptive Multimodal HRI Framework - Robot Controller Configuration
+# ==============================================================================
+
+controller:
+  # Execution mode: "mock" for simulation without ROS, "ros2" for actual hardware
+  mode: "mock"
+  
+  # Movement parameters
+  linear_speed: 0.2  # m/s
+  angular_speed: 0.5  # rad/s
+  
+  # ROS2 topic
+  cmd_vel_topic: "/cmd_vel"
+  
+  # Control loop rate in Hz
+  control_rate: 10
+  
+  # Default duration for discrete actions in seconds
+  default_duration: 1.0

@@ -1,0 +1,19 @@
+# Voice Agent Configuration for Adaptive Multimodal HRI
+voice:
+  backend: "whisper"                # "whisper", "speech_commands", or "mock"
+  model_name: "base"                # Whisper model: "tiny", "base", "small", "medium"
+  device: "auto"                    # "cuda", "cpu", or "auto"
+  sample_rate: 16000                # Audio sampling rate in Hz (standard for speech recognition)
+  vad_energy_threshold: 0.005       # RMS energy threshold for Voice Activity Detection
+  confidence_threshold: 0.50        # Minimum transcription confidence
+  language: "en"                    # Speech language ("en", "auto", etc.)
+
+audio:
+  chunk_duration_sec: 2.0           # Audio buffer chunk duration for continuous listening
+  channels: 1                       # Mono channel
+  record_seconds: 3.0               # Recording duration for single command capture
+
+intent_extraction:
+  enable_spatial_cues: true         # Extract LEFT, CENTER, RIGHT spatial sectors
+  enable_proximity_cues: true       # Extract NEAR, FAR, CLOSEST proximity modifiers
+  enable_urgency_detection: true    # Detect emergency / high-priority safety stops

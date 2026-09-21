@@ -1,0 +1,11 @@
+# Memory Agent Configuration for Adaptive Multimodal HRI
+memory:
+  backend: "in_memory"              # "in_memory" or "sqlite" (future)
+  max_history_size: 200             # Maximum chronological entries stored before FIFO eviction
+  default_retrieval_limit: 5        # Default number of entries returned per query
+  enable_pronoun_resolution: true   # Resolve 'it', 'that', 'the object' to recent targets
+
+context:
+  track_last_target: true           # Maintain pointer to most recent valid target
+  track_last_action: true           # Maintain pointer to most recent valid action
+  track_last_location: true         # Maintain pointer to most recent valid spatial location

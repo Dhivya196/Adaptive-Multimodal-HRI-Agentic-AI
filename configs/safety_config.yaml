@@ -1,0 +1,35 @@
+# ==============================================================================
+# Adaptive Multimodal HRI Framework - Safety Agent Configuration
+# ==============================================================================
+
+safety:
+  # Proximity and collision boundary thresholds (meters)
+  danger_distance: 0.35
+  safe_distance: 0.50
+
+  # Perception and target confidence threshold for safe autonomous execution
+  confidence_threshold: 0.60
+
+  # Sensor failure policy: "human_approval_on_missing" or "strict_stop"
+  sensor_policy: "human_approval_on_missing"
+
+  # Whether contextual LLM risk reasoning is enabled
+  llm_enabled: false
+
+  # Fallback policy on LLM timeout or error: "HUMAN_APPROVAL_REQUIRED" or "STOP"
+  default_on_llm_failure: "HUMAN_APPROVAL_REQUIRED"
+
+  # Human-in-the-loop configuration
+  human_intervention_enabled: true
+  human_intervention_mode: "auto_stub"  # "auto_stub" for headless/tests, "cli" for interactive terminal prompts
+
+  # Logging level
+  log_level: "INFO"
+
+llm:
+  provider: "ollama"
+  model: "llama3"
+  host: "http://localhost:11434"
+  temperature: 0.0
+  timeout: 5.0
+  api_key_env: "OPENAI_API_KEY"

@@ -74,20 +74,53 @@ class MultimodalTask:
 
 class HRIState(TypedDict, total=False):
     """
-    Strongly-typed shared state for the Coordinator LangGraph workflow.
-    Optional fields exist for future extension compatibility without being implemented now.
+    Strongly-typed shared state for the multi-agent LangGraph workflow.
+    Carries multimodal inputs, coordinator fusion, memory context, planning,
+    safety evaluation, human intervention, and controller execution state.
     """
-    voice_output: Optional[VoiceAgentOutput]
-    vision_output: Optional[VisionAgentOutput]
-    gesture_output: Optional[GestureAgentOutput]
+    # Perception inputs
+    voice_output: Optional[Any]
+    vision_output: Optional[Any]
+    gesture_output: Optional[Any]
+
+    # Environment & sensor measurements for safety & hardware
+    obstacle_distance: Optional[float]
+    human_distance: Optional[float]
+    emergency_stop: Optional[bool]
+    sensor_validity: Optional[Dict[str, bool]]
+    target_confidence: Optional[float]
+    environment_context: Optional[Dict[str, Any]]
+    robot_state: Optional[Dict[str, Any]]
+
+    # Coordinator Orchestration
     task: Optional[MultimodalTask]
     task_status: Optional[str]
+
+    # Memory & Context
+    memory_context: Optional[Dict[str, Any]]
+    memory_output: Optional[Any]
+
+    # Task Planning
+    task_plan: Optional[Any]
+    planner_output: Optional[Any]
+
+    # Safety Evaluation
+    safety_decision: Optional[Any]
+    safety_output: Optional[Any]
+    safety_decision_type: Optional[str]
+
+    # Human Intervention
+    human_intervention_required: Optional[bool]
+    human_intervention_result: Optional[Any]
+
+    # Robot Controller Execution
+    controller_input: Optional[Any]
+    controller_output: Optional[Any]
+    execution_result: Optional[Any]
+
+    # Pipeline metadata & errors
     metadata: Dict[str, Any]
     errors: List[str]
-    # Future compatibility hooks (not implemented by Coordinator)
-    memory_context: Optional[Dict[str, Any]]
-    safety_status: Optional[str]
-    robot_action: Optional[Dict[str, Any]]
 
 
 @dataclass

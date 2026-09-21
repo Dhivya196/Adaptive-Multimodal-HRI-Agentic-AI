@@ -132,8 +132,10 @@ class MultimodalFusionEngine:
             if candidates:
                 # Sector disambiguation if sector is specified in Voice or Gesture
                 desired_sector = intent.spatial_sector
-                if gesture_output and gesture_output.pointing_direction:
-                    desired_sector = gesture_output.pointing_direction
+                if gesture_output:
+                    g_dir = getattr(gesture_output, "pointing_direction", None) or getattr(gesture_output, "direction", None)
+                    if g_dir and str(g_dir).upper() not in ("NONE", "UNKNOWN"):
+                        desired_sector = str(g_dir)
 
                 if desired_sector:
                     sector_matches = [

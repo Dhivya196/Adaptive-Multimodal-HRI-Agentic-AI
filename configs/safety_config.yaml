@@ -14,7 +14,7 @@ safety:
   sensor_policy: "human_approval_on_missing"
 
   # Whether contextual LLM risk reasoning is enabled
-  llm_enabled: false
+  llm_enabled: true
 
   # Fallback policy on LLM timeout or error: "HUMAN_APPROVAL_REQUIRED" or "STOP"
   default_on_llm_failure: "HUMAN_APPROVAL_REQUIRED"
@@ -28,8 +28,8 @@ safety:
 
 llm:
   provider: "ollama"
-  model: "llama3"
+  model: "llama3.2:1b"
   host: "http://localhost:11434"
   temperature: 0.0
-  timeout: 5.0
+  timeout: 30.0
   api_key_env: "OPENAI_API_KEY"

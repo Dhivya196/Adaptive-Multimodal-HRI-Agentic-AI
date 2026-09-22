@@ -214,7 +214,7 @@ class GestureAgent(BaseAgent):
             agent_name=self.name,
             agent_type=self.agent_type.value,
             success=True,
-            confidence=primary_conf if is_detected else 1.0,
+            confidence=primary_conf if is_detected else 0.0,
             gesture=primary_gesture,
             direction=primary_direction,
             is_gesture_detected=is_detected,

@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional
 
 from src.agents.coordinator.schemas import (
     GestureAgentOutput,
+    GroundingStatus,
     MultimodalTask,
     TaskStatus,
 )
@@ -36,16 +37,52 @@ class MultimodalFusionEngine:
     def __init__(
         self,
         min_confidence_threshold: float = 0.40,
+        high_confidence_threshold: float = 0.60,
+        ambiguity_threshold: float = 0.10,
         voice_weight: float = 0.55,
         vision_weight: float = 0.35,
         gesture_weight: float = 0.10,
         require_visual_target_confirmation: bool = True,
     ):
         self.min_confidence_threshold = min_confidence_threshold
+        self.high_confidence_threshold = high_confidence_threshold
+        self.ambiguity_threshold = ambiguity_threshold
         self.voice_weight = voice_weight
         self.vision_weight = vision_weight
         self.gesture_weight = gesture_weight
         self.require_visual_target_confirmation = require_visual_target_confirmation
+
+    def _get_proximity_score(self, proximity: Optional[ProximityLevel]) -> float:
+        """Convert proximity category into normalized numerical grounding score."""
+        if proximity == ProximityLevel.NEAR:
+            return 1.0
+        elif proximity == ProximityLevel.MEDIUM:
+            return 0.85
+        elif proximity == ProximityLevel.FAR:
+            return 0.70
+        return 0.80
+
+    def calculate_referential_grounding_score(
+        self,
+        object_confidence: float,
+        gesture_confidence: float,
+        spatial_agreement: bool,
+        proximity: Optional[ProximityLevel] = None,
+    ) -> float:
+        """
+        Calculate a composite referential grounding score based on:
+        - object detection confidence
+        - spatial agreement with gesture
+        - gesture confidence
+        - proximity factor
+        """
+        if not spatial_agreement:
+            return 0.0
+
+        prox_score = self._get_proximity_score(proximity)
+        # Weighted composite score: 50% object detection, 35% gesture pointing, 15% proximity
+        score = (0.50 * object_confidence) + (0.35 * gesture_confidence) + (0.15 * prox_score)
+        return max(0.0, min(1.0, score))
 
     def associate_pointing_target(
         self,
@@ -64,17 +101,21 @@ class MultimodalFusionEngine:
             return {
                 "is_pointing": False,
                 "status": None,
+                "grounding_status": GroundingStatus.UNRESOLVED,
                 "reason": "No reliable gesture detected or gesture confidence is below threshold.",
                 "matched_object": None,
                 "matching_candidates": [],
+                "all_scored_candidates": [],
                 "target_sector": None,
                 "direction_str": "NONE",
                 "gesture_name": "NONE",
                 "sector_str": "NONE",
+                "referential_score": 0.0,
             }
 
         g_type = str(getattr(gesture_output, "gesture", None) or getattr(gesture_output, "gesture_type", "") or "").upper()
         g_dir = str(getattr(gesture_output, "direction", None) or getattr(gesture_output, "pointing_direction", "") or "").upper()
+        g_conf = max(0.0, min(1.0, getattr(gesture_output, "confidence", 0.0)))
 
         # Check if gesture or direction indicates pointing
         is_pointing = (
@@ -87,13 +128,16 @@ class MultimodalFusionEngine:
             return {
                 "is_pointing": False,
                 "status": None,
+                "grounding_status": GroundingStatus.UNRESOLVED,
                 "reason": f"Gesture '{g_type}' is not a directional pointing gesture.",
                 "matched_object": None,
                 "matching_candidates": [],
+                "all_scored_candidates": [],
                 "target_sector": None,
                 "direction_str": g_dir or g_type or "NONE",
                 "gesture_name": g_type or "NONE",
                 "sector_str": "NONE",
+                "referential_score": 0.0,
             }
 
         # Resolve mapped spatial sector
@@ -110,30 +154,55 @@ class MultimodalFusionEngine:
             return {
                 "is_pointing": False,
                 "status": None,
+                "grounding_status": GroundingStatus.UNRESOLVED,
                 "reason": f"Unknown directional pointing grounding for gesture '{g_type}' / direction '{g_dir}'.",
                 "matched_object": None,
                 "matching_candidates": [],
+                "all_scored_candidates": [],
                 "target_sector": None,
                 "direction_str": g_dir or g_type,
                 "gesture_name": g_type,
                 "sector_str": "NONE",
+                "referential_score": 0.0,
             }
 
         sector_str = mapped_sector.value if isinstance(mapped_sector, SpatialSector) else str(mapped_sector)
 
-        # Obtain candidates in that sector from VisionAgent
+        # Inspect ALL candidates in the visual scene and score each candidate
         all_objects = vision_output.detected_objects if vision_output else []
-        matching_candidates = [
-            obj for obj in all_objects
-            if obj.spatial_sector == mapped_sector or (
-                isinstance(obj.spatial_sector, SpatialSector) and obj.spatial_sector.value.upper() == sector_str.upper()
+        all_scored_candidates = []
+        matching_candidates: List[DetectedObject] = []
+
+        for obj in all_objects:
+            obj_sec = obj.spatial_sector.value if isinstance(obj.spatial_sector, SpatialSector) else str(obj.spatial_sector)
+            sec_match = (
+                obj.spatial_sector == mapped_sector
+                or (isinstance(obj.spatial_sector, SpatialSector) and obj.spatial_sector.value.upper() == sector_str.upper())
+                or (str(obj_sec).upper() == sector_str.upper())
             )
-        ]
+            ref_score = self.calculate_referential_grounding_score(
+                object_confidence=obj.confidence,
+                gesture_confidence=g_conf,
+                spatial_agreement=sec_match,
+                proximity=obj.proximity,
+            )
+            all_scored_candidates.append({
+                "object": obj,
+                "spatial_agreement": sec_match,
+                "object_confidence": obj.confidence,
+                "referential_score": ref_score,
+            })
+            if sec_match:
+                matching_candidates.append(obj)
+
+        matched_object: Optional[DetectedObject] = None
+        matched_ref_score: float = 0.0
 
         if len(matching_candidates) == 0:
             if len(all_objects) > 0:
                 # Objects exist in visual scene, but in DIFFERENT sector(s) than pointed (MODALITY_CONFLICT)
                 status = TaskStatus.MODALITY_CONFLICT
+                grounding_status = GroundingStatus.MODALITY_CONFLICT
                 cand_locs = ", ".join([
                     f"{o.label} ({o.spatial_sector.value if isinstance(o.spatial_sector, SpatialSector) else o.spatial_sector})"
                     for o in all_objects
@@ -145,66 +214,103 @@ class MultimodalFusionEngine:
             else:
                 # No objects detected anywhere in the visual scene (TARGET_NOT_FOUND)
                 status = TaskStatus.TARGET_NOT_FOUND
+                grounding_status = GroundingStatus.UNRESOLVED
                 reason = f"Gesture pointed {direction_str} -> {sector_str}, but no visual candidates were detected in the scene."
             matched_object = None
+
         elif len(matching_candidates) == 1:
-            status = TaskStatus.VALID
             matched_object = matching_candidates[0]
-            reason = f"Gesture pointed {direction_str} -> {sector_str}, successfully matched candidate '{matched_object.label}'."
+            matched_ref_score = self.calculate_referential_grounding_score(
+                object_confidence=matched_object.confidence,
+                gesture_confidence=g_conf,
+                spatial_agreement=True,
+                proximity=matched_object.proximity,
+            )
+            if matched_object.confidence >= self.high_confidence_threshold:
+                grounding_status = GroundingStatus.HIGH_CONFIDENCE
+                status = TaskStatus.VALID
+                reason = (
+                    f"Gesture pointed {direction_str} -> {sector_str}, successfully matched candidate "
+                    f"'{matched_object.label}' with high confidence ({matched_object.confidence:.2f})."
+                )
+            else:
+                grounding_status = GroundingStatus.LOW_CONFIDENCE
+                status = TaskStatus.VALID
+                reason = (
+                    f"Gesture pointed {direction_str} -> {sector_str}, associated candidate "
+                    f"'{matched_object.label}' but object confidence ({matched_object.confidence:.2f}) is below threshold ({self.high_confidence_threshold:.2f})."
+                )
+
         else:
-            status = TaskStatus.AMBIGUOUS_TARGET
-            matched_object = None
-            cand_names = ", ".join([c.label for c in matching_candidates])
-            reason = f"Gesture pointed {direction_str} -> {sector_str}, but multiple objects ({cand_names}) occupy sector {sector_str}."
+            # Multiple objects present in the pointed sector
+            matching_candidates.sort(key=lambda o: o.confidence, reverse=True)
+            top_obj = matching_candidates[0]
+            second_obj = matching_candidates[1]
+
+            # Check if candidates have ambiguous / close confidence
+            if abs(top_obj.confidence - second_obj.confidence) <= self.ambiguity_threshold:
+                status = TaskStatus.AMBIGUOUS_TARGET
+                grounding_status = GroundingStatus.AMBIGUOUS
+                matched_object = None
+                cand_names = ", ".join([f"{c.label} ({c.confidence:.2f})" for c in matching_candidates])
+                reason = f"Multiple objects are present in the pointed sector ({sector_str}) with similar confidence: {cand_names}."
+            else:
+                # Distinct dominant candidate
+                matched_object = top_obj
+                matched_ref_score = self.calculate_referential_grounding_score(
+                    object_confidence=matched_object.confidence,
+                    gesture_confidence=g_conf,
+                    spatial_agreement=True,
+                    proximity=matched_object.proximity,
+                )
+                if matched_object.confidence >= self.high_confidence_threshold:
+                    grounding_status = GroundingStatus.HIGH_CONFIDENCE
+                else:
+                    grounding_status = GroundingStatus.LOW_CONFIDENCE
+                status = TaskStatus.VALID
+                reason = f"Gesture pointed {direction_str} -> {sector_str}, selected dominant candidate '{matched_object.label}'."
 
         return {
             "is_pointing": True,
             "status": status,
+            "grounding_status": grounding_status,
             "reason": reason,
             "matched_object": matched_object,
             "matching_candidates": matching_candidates,
+            "all_scored_candidates": all_scored_candidates,
             "target_sector": mapped_sector,
             "direction_str": direction_str,
             "gesture_name": g_type or "POINTING",
+            "gesture_confidence": g_conf,
             "sector_str": sector_str,
+            "referential_score": matched_ref_score,
         }
 
     def _print_debug_association(
         self,
-        voice_action: str,
-        voice_target: str,
-        vision_objects: List[DetectedObject],
+        voice_ref: str,
         gesture_name: str,
         gesture_conf: float,
-        sector_str: str,
-        candidates: List[DetectedObject],
-        selected_target: Optional[str],
-        final_action: str,
-        final_target: Optional[str],
-        final_status: str,
+        candidate_name: Optional[str],
+        object_conf: Optional[float],
+        spatial_agreement: bool,
+        grounding_status: str,
     ):
         """Print concise Coordinator debug output for live demonstration."""
         print("\n" + "=" * 50)
         print("[COORDINATOR]")
-        print(f"Voice action: {voice_action.upper()}")
-        print(f"Voice target: {voice_target or 'it'}")
-        print("\nVision candidates:")
-        if vision_objects:
-            for obj in vision_objects:
-                sec = obj.spatial_sector.value if isinstance(obj.spatial_sector, SpatialSector) else obj.spatial_sector
-                print(f"  {obj.label:<10} -> {sec} ({obj.confidence:.2f})")
+        print(f"  Voice reference       : \"{voice_ref}\"")
+        if gesture_name and gesture_name != "NONE":
+            print(f"  Gesture               : {gesture_name} ({gesture_conf:.2f})")
         else:
-            print("  (None)")
-        print(f"\nGesture:\n  {gesture_name} ({gesture_conf:.2f})")
-        print("\nTarget association:")
-        print(f"  {gesture_name} -> {sector_str}")
-        cands_str = ", ".join([c.label for c in candidates]) if candidates else "none"
-        print(f"  {sector_str} candidates -> {cands_str}")
-        print(f"  Selected target -> {selected_target or 'None'}")
-        print("\nFusion:")
-        print(f"  action = {final_action.upper()}")
-        print(f"  target = {final_target or 'None'}")
-        print(f"  status = {final_status}")
+            print("  Gesture               : NONE")
+        print(f"  Candidate             : {candidate_name or 'None'}")
+        if object_conf is not None:
+            print(f"  Object confidence     : {object_conf:.2f}")
+        else:
+            print("  Object confidence     : N/A")
+        print(f"  Spatial agreement     : {str(spatial_agreement).upper()}")
+        print(f"  Grounding status      : {grounding_status}")
         print("=" * 50 + "\n", flush=True)
 
     def fuse(
@@ -241,6 +347,7 @@ class MultimodalFusionEngine:
                     action="none",
                     confidence=max(0.1, voice_output.confidence),
                     task_status=TaskStatus.INVALID_INPUT,
+                    grounding_status=GroundingStatus.UNRESOLVED,
                     reasoning="Speech was transcribed but no actionable intent was parsed.",
                     modality_contributions={"voice": voice_output.confidence},
                 )
@@ -248,6 +355,7 @@ class MultimodalFusionEngine:
                 action="none",
                 confidence=0.0,
                 task_status=TaskStatus.INVALID_INPUT,
+                grounding_status=GroundingStatus.UNRESOLVED,
                 reasoning="No valid perception data received from Voice, Vision, or Gesture agents.",
             )
 
@@ -262,6 +370,7 @@ class MultimodalFusionEngine:
                     urgency=UrgencyLevel.EMERGENCY,
                     confidence=voice_output.confidence,
                     task_status=TaskStatus.VALID,
+                    grounding_status=GroundingStatus.HIGH_CONFIDENCE,
                     reasoning="Immediate stop command received with critical urgency.",
                     modality_contributions={"voice": voice_output.confidence},
                 )
@@ -286,6 +395,7 @@ class MultimodalFusionEngine:
         return MultimodalTask(
             action="none",
             task_status=TaskStatus.INVALID_INPUT,
+            grounding_status=GroundingStatus.UNRESOLVED,
             reasoning="Unable to fuse inputs with current perception state.",
         )
 
@@ -319,59 +429,76 @@ class MultimodalFusionEngine:
         if is_referential:
             if assoc["status"] == TaskStatus.VALID:
                 matched_obj: DetectedObject = assoc["matched_object"]
+                target_conf = matched_obj.confidence
                 fused_conf = (
                     (self.voice_weight * voice_conf)
-                    + (self.vision_weight * matched_obj.confidence)
+                    + (self.vision_weight * target_conf)
                     + (self.gesture_weight * gesture_conf)
                 )
                 modality_contrib = {
                     "voice": voice_conf,
-                    "vision": matched_obj.confidence,
+                    "vision": target_conf,
                     "gesture": gesture_conf,
                 }
+
+                if target_conf >= self.high_confidence_threshold:
+                    grounding_st = GroundingStatus.HIGH_CONFIDENCE
+                    ref_grounding_st = "HIGH_CONFIDENCE"
+                else:
+                    grounding_st = GroundingStatus.LOW_CONFIDENCE
+                    ref_grounding_st = GroundingStatus.LOW_CONFIDENCE_REFERENTIAL_GROUNDING.value
+
+                if fused_conf < self.min_confidence_threshold or target_conf < self.min_confidence_threshold:
+                    task_st = TaskStatus.LOW_CONFIDENCE
+                else:
+                    task_st = TaskStatus.VALID
+
                 meta = {
                     "target_source": "voice + vision + gesture",
+                    "voice_reference": raw_target or "it",
                     "gesture_used": True,
                     "gesture_direction": assoc["direction_str"],
+                    "gesture_confidence": gesture_conf,
                     "pointing_direction": assoc["direction_str"],
                     "gesture_confirmation": True,
                     "visual_target": matched_obj.label,
-                    "visual_target_confirmation": True,
+                    "visual_target_confidence": target_conf,
+                    "perception_confidence": target_conf,
+                    "spatial_agreement": True,
+                    "grounding_status": grounding_st.value,
+                    "referential_grounding_status": ref_grounding_st,
                     "multimodal_target_association": True,
                 }
 
-                if fused_conf < self.min_confidence_threshold or matched_obj.confidence < self.min_confidence_threshold:
-                    status = TaskStatus.LOW_CONFIDENCE
-                else:
-                    status = TaskStatus.VALID
-
                 self._print_debug_association(
-                    voice_action=action,
-                    voice_target=raw_target or "it",
-                    vision_objects=vision_output.detected_objects,
-                    gesture_name=assoc["gesture_name"],
+                    voice_ref=raw_target or "it",
+                    gesture_name=f"{assoc['gesture_name']} ({assoc['direction_str']})",
                     gesture_conf=gesture_conf,
-                    sector_str=assoc["sector_str"],
-                    candidates=assoc["matching_candidates"],
-                    selected_target=matched_obj.label,
-                    final_action=action,
-                    final_target=matched_obj.label,
-                    final_status=status.value,
+                    candidate_name=matched_obj.label,
+                    object_conf=target_conf,
+                    spatial_agreement=True,
+                    grounding_status=grounding_st.value,
                 )
 
                 return MultimodalTask(
                     action=action,
                     target_object=matched_obj.label,
                     target_confirmed=True,
+                    target_confidence=target_conf,
                     spatial_sector=matched_obj.spatial_sector,
                     proximity=matched_obj.proximity,
                     urgency=intent.urgency,
                     confidence=fused_conf,
-                    task_status=status,
+                    grounding_status=grounding_st,
+                    referential_grounding_status=ref_grounding_st,
+                    referential_grounding_score=assoc.get("referential_score", 0.0),
+                    spatial_agreement=True,
+                    task_status=task_st,
                     matched_visual_object=matched_obj,
                     reasoning=(
                         f"Multimodal target association: referential target '{raw_target or 'it'}' resolved to "
-                        f"'{matched_obj.label}' in sector {matched_obj.spatial_sector.value} via gesture {assoc['gesture_name']} ({assoc['direction_str']})."
+                        f"'{matched_obj.label}' (conf: {target_conf:.2f}) in sector {matched_obj.spatial_sector.value} "
+                        f"via gesture {assoc['gesture_name']} ({assoc['direction_str']}). Grounding: {grounding_st.value}."
                     ),
                     modality_contributions=modality_contrib,
                     metadata=meta,
@@ -384,32 +511,36 @@ class MultimodalFusionEngine:
                     + (self.gesture_weight * gesture_conf)
                 )
                 self._print_debug_association(
-                    voice_action=action,
-                    voice_target=raw_target or "it",
-                    vision_objects=vision_output.detected_objects,
-                    gesture_name=assoc["gesture_name"],
+                    voice_ref=raw_target or "it",
+                    gesture_name=f"{assoc['gesture_name']} ({assoc['direction_str']})",
                     gesture_conf=gesture_conf,
-                    sector_str=assoc["sector_str"],
-                    candidates=assoc["matching_candidates"],
-                    selected_target=None,
-                    final_action=action,
-                    final_target=raw_target or "it",
-                    final_status=TaskStatus.AMBIGUOUS_TARGET.value,
+                    candidate_name=None,
+                    object_conf=None,
+                    spatial_agreement=True,
+                    grounding_status=GroundingStatus.AMBIGUOUS.value,
                 )
 
                 return MultimodalTask(
                     action=action,
                     target_object=raw_target or "ambiguous_target",
                     target_confirmed=False,
+                    target_confidence=vision_conf,
                     spatial_sector=assoc["target_sector"],
                     urgency=intent.urgency,
                     confidence=fused_conf * 0.6,
+                    grounding_status=GroundingStatus.AMBIGUOUS,
+                    referential_grounding_status=GroundingStatus.AMBIGUOUS.value,
+                    spatial_agreement=True,
                     task_status=TaskStatus.AMBIGUOUS_TARGET,
                     reasoning=assoc["reason"],
                     modality_contributions={"voice": voice_conf, "vision": vision_conf, "gesture": gesture_conf},
                     metadata={
+                        "voice_reference": raw_target or "it",
                         "gesture_used": True,
                         "gesture_direction": assoc["direction_str"],
+                        "gesture_confidence": gesture_conf,
+                        "spatial_agreement": True,
+                        "grounding_status": GroundingStatus.AMBIGUOUS.value,
                         "ambiguous_candidates": [c.label for c in assoc["matching_candidates"]],
                     },
                 )
@@ -421,17 +552,13 @@ class MultimodalFusionEngine:
                     + (self.gesture_weight * gesture_conf)
                 )
                 self._print_debug_association(
-                    voice_action=action,
-                    voice_target=raw_target or "it",
-                    vision_objects=vision_output.detected_objects,
-                    gesture_name=assoc["gesture_name"],
+                    voice_ref=raw_target or "it",
+                    gesture_name=f"{assoc['gesture_name']} ({assoc['direction_str']})",
                     gesture_conf=gesture_conf,
-                    sector_str=assoc["sector_str"],
-                    candidates=[],
-                    selected_target=None,
-                    final_action=action,
-                    final_target=raw_target or "it",
-                    final_status=TaskStatus.MODALITY_CONFLICT.value,
+                    candidate_name=None,
+                    object_conf=None,
+                    spatial_agreement=False,
+                    grounding_status=GroundingStatus.MODALITY_CONFLICT.value,
                 )
 
                 return MultimodalTask(
@@ -441,12 +568,18 @@ class MultimodalFusionEngine:
                     spatial_sector=assoc["target_sector"],
                     urgency=intent.urgency,
                     confidence=fused_conf * 0.7,
+                    grounding_status=GroundingStatus.MODALITY_CONFLICT,
+                    referential_grounding_status=GroundingStatus.MODALITY_CONFLICT.value,
+                    spatial_agreement=False,
                     task_status=TaskStatus.MODALITY_CONFLICT,
                     reasoning=assoc["reason"],
                     modality_contributions={"voice": voice_conf, "vision": vision_conf, "gesture": gesture_conf},
                     metadata={
+                        "voice_reference": raw_target or "it",
                         "gesture_used": True,
                         "gesture_direction": assoc["direction_str"],
+                        "gesture_confidence": gesture_conf,
+                        "spatial_agreement": False,
                         "conflict": "gesture_points_empty_sector_while_objects_exist_elsewhere",
                     },
                 )
@@ -458,17 +591,13 @@ class MultimodalFusionEngine:
                     + (self.gesture_weight * gesture_conf)
                 )
                 self._print_debug_association(
-                    voice_action=action,
-                    voice_target=raw_target or "it",
-                    vision_objects=vision_output.detected_objects,
-                    gesture_name=assoc["gesture_name"],
+                    voice_ref=raw_target or "it",
+                    gesture_name=f"{assoc['gesture_name']} ({assoc['direction_str']})",
                     gesture_conf=gesture_conf,
-                    sector_str=assoc["sector_str"],
-                    candidates=[],
-                    selected_target=None,
-                    final_action=action,
-                    final_target=raw_target or "it",
-                    final_status=TaskStatus.TARGET_NOT_FOUND.value,
+                    candidate_name=None,
+                    object_conf=None,
+                    spatial_agreement=False,
+                    grounding_status=GroundingStatus.UNRESOLVED.value,
                 )
 
                 return MultimodalTask(
@@ -478,12 +607,17 @@ class MultimodalFusionEngine:
                     spatial_sector=assoc["target_sector"],
                     urgency=intent.urgency,
                     confidence=fused_conf * 0.4,
+                    grounding_status=GroundingStatus.UNRESOLVED,
+                    referential_grounding_status=GroundingStatus.UNRESOLVED.value,
+                    spatial_agreement=False,
                     task_status=TaskStatus.TARGET_NOT_FOUND,
                     reasoning=assoc["reason"],
                     modality_contributions={"voice": voice_conf, "vision": vision_conf, "gesture": gesture_conf},
                     metadata={
+                        "voice_reference": raw_target or "it",
                         "gesture_used": True,
                         "gesture_direction": assoc["direction_str"],
+                        "gesture_confidence": gesture_conf,
                     },
                 )
 
@@ -503,6 +637,7 @@ class MultimodalFusionEngine:
                 target_confirmed=False,
                 urgency=intent.urgency,
                 confidence=voice_conf * 0.5,
+                grounding_status=GroundingStatus.UNRESOLVED,
                 task_status=TaskStatus.TARGET_NOT_FOUND,
                 reasoning=(
                     f"Voice command requested target '{raw_target}', but no matching object was "
@@ -521,56 +656,66 @@ class MultimodalFusionEngine:
         ]
 
         if matching_in_sector:
-            # Agreement between voice target and gesture pointing direction
+            # Spatial agreement between explicit voice target and gesture pointing direction
             matched_obj = max(matching_in_sector, key=lambda o: o.confidence)
+            target_conf = matched_obj.confidence
             fused_conf = (
                 (self.voice_weight * voice_conf)
-                + (self.vision_weight * matched_obj.confidence)
+                + (self.vision_weight * target_conf)
                 + (self.gesture_weight * gesture_conf)
             )
             modality_contrib = {
                 "voice": voice_conf,
-                "vision": matched_obj.confidence,
+                "vision": target_conf,
                 "gesture": gesture_conf,
             }
-            meta = {
-                "target_source": "voice + vision + gesture",
-                "gesture_used": True,
-                "gesture_direction": assoc["direction_str"],
-                "pointing_direction": assoc["direction_str"],
-                "gesture_confirmation": True,
-                "visual_target": matched_obj.label,
-                "visual_target_confirmation": True,
-                "multimodal_target_association": True,
-            }
 
-            if fused_conf < self.min_confidence_threshold or matched_obj.confidence < self.min_confidence_threshold:
+            if target_conf >= self.high_confidence_threshold:
+                grounding_st = GroundingStatus.HIGH_CONFIDENCE
+            else:
+                grounding_st = GroundingStatus.LOW_CONFIDENCE
+
+            if fused_conf < self.min_confidence_threshold or target_conf < self.min_confidence_threshold:
                 status = TaskStatus.LOW_CONFIDENCE
             else:
                 status = TaskStatus.VALID
 
+            meta = {
+                "target_source": "voice + vision + gesture",
+                "gesture_used": True,
+                "gesture_direction": assoc["direction_str"],
+                "gesture_confidence": gesture_conf,
+                "pointing_direction": assoc["direction_str"],
+                "gesture_confirmation": True,
+                "visual_target": matched_obj.label,
+                "visual_target_confidence": target_conf,
+                "spatial_agreement": True,
+                "grounding_status": grounding_st.value,
+                "visual_target_confirmation": True,
+                "multimodal_target_association": True,
+            }
+
             self._print_debug_association(
-                voice_action=action,
-                voice_target=raw_target,
-                vision_objects=vision_output.detected_objects,
-                gesture_name=assoc["gesture_name"],
+                voice_ref=raw_target,
+                gesture_name=f"{assoc['gesture_name']} ({assoc['direction_str']})",
                 gesture_conf=gesture_conf,
-                sector_str=sector_str,
-                candidates=matching_in_sector,
-                selected_target=matched_obj.label,
-                final_action=action,
-                final_target=matched_obj.label,
-                final_status=status.value,
+                candidate_name=matched_obj.label,
+                object_conf=target_conf,
+                spatial_agreement=True,
+                grounding_status=grounding_st.value,
             )
 
             return MultimodalTask(
                 action=action,
                 target_object=matched_obj.label,
                 target_confirmed=True,
+                target_confidence=target_conf,
                 spatial_sector=matched_obj.spatial_sector,
                 proximity=matched_obj.proximity,
                 urgency=intent.urgency,
                 confidence=fused_conf,
+                grounding_status=grounding_st,
+                spatial_agreement=True,
                 task_status=status,
                 matched_visual_object=matched_obj,
                 reasoning=(
@@ -581,46 +726,55 @@ class MultimodalFusionEngine:
                 metadata=meta,
             )
         else:
-            # Modality conflict: target object detected in a different sector than pointed by gesture
+            # Spatial conflict: explicit target object detected in a different sector than pointed by gesture
+            # Retain the explicit target name; DO NOT replace with unrelated objects in the pointed sector
             matched_obj = max(matching_voice_objs, key=lambda o: o.confidence)
+            target_conf = matched_obj.confidence
             fused_conf = (
                 (self.voice_weight * voice_conf)
-                + (self.vision_weight * matched_obj.confidence)
+                + (self.vision_weight * target_conf)
                 + (self.gesture_weight * gesture_conf)
             )
+
             self._print_debug_association(
-                voice_action=action,
-                voice_target=raw_target,
-                vision_objects=vision_output.detected_objects,
-                gesture_name=assoc["gesture_name"],
+                voice_ref=raw_target,
+                gesture_name=f"{assoc['gesture_name']} ({assoc['direction_str']})",
                 gesture_conf=gesture_conf,
-                sector_str=sector_str,
-                candidates=matching_voice_objs,
-                selected_target=None,
-                final_action=action,
-                final_target=raw_target,
-                final_status=TaskStatus.MODALITY_CONFLICT.value,
+                candidate_name=matched_obj.label,
+                object_conf=target_conf,
+                spatial_agreement=False,
+                grounding_status=GroundingStatus.EXPLICIT_TARGET_SPATIAL_CONFLICT.value,
             )
 
             return MultimodalTask(
                 action=action,
                 target_object=raw_target,
                 target_confirmed=True,
+                target_confidence=target_conf,
                 spatial_sector=matched_obj.spatial_sector,
                 proximity=matched_obj.proximity,
                 urgency=intent.urgency,
                 confidence=fused_conf * 0.7,
+                grounding_status=GroundingStatus.EXPLICIT_TARGET_SPATIAL_CONFLICT,
+                spatial_agreement=False,
                 task_status=TaskStatus.MODALITY_CONFLICT,
                 matched_visual_object=matched_obj,
                 reasoning=(
-                    f"Modality conflict: Voice target '{raw_target}' detected in sector '{matched_obj.spatial_sector.value}', "
+                    f"Explicit target spatial conflict: Voice target '{raw_target}' detected in sector '{matched_obj.spatial_sector.value}', "
                     f"but gesture pointed '{assoc['direction_str']}'."
                 ),
-                modality_contributions={"voice": voice_conf, "vision": matched_obj.confidence, "gesture": gesture_conf},
+                modality_contributions={"voice": voice_conf, "vision": target_conf, "gesture": gesture_conf},
                 metadata={
                     "gesture_used": True,
                     "gesture_direction": assoc["direction_str"],
-                    "conflict": "voice_vision_sector_vs_gesture_direction",
+                    "gesture_confidence": gesture_conf,
+                    "spatial_agreement": False,
+                    "conflict": "explicit_target_spatial_conflict",
+                    "target_sector": (
+                        matched_obj.spatial_sector.value
+                        if isinstance(matched_obj.spatial_sector, SpatialSector)
+                        else str(matched_obj.spatial_sector)
+                    ),
                 },
             )
 
@@ -668,19 +822,60 @@ class MultimodalFusionEngine:
                 else:
                     matched_obj = max(candidates, key=lambda o: o.confidence)
 
-        # Referential pronoun with no gesture -> leave unconfirmed for MemoryAgent cross-turn resolution
+        # Referential pronoun with no gesture
         if is_referential:
             fused_conf = (self.voice_weight * voice_conf) + (self.vision_weight * vision_output.confidence)
-            return MultimodalTask(
-                action=action,
-                target_object=target_name,
-                target_confirmed=False,
-                urgency=intent.urgency,
-                confidence=fused_conf,
-                task_status=TaskStatus.VALID,
-                reasoning=f"Referential target '{target_name}' passed to MemoryAgent for cross-turn context resolution.",
-                modality_contributions={"voice": voice_conf, "vision": vision_output.confidence},
-            )
+            detected_objs = vision_output.detected_objects or []
+
+            if len(detected_objs) > 1:
+                # Ambiguous deictic target without gesture pointing to resolve it
+                return MultimodalTask(
+                    action=action,
+                    target_object=target_name or "it",
+                    target_confirmed=False,
+                    target_confidence=vision_output.confidence,
+                    urgency=intent.urgency,
+                    confidence=fused_conf * 0.6,
+                    grounding_status=GroundingStatus.AMBIGUOUS,
+                    referential_grounding_status=GroundingStatus.AMBIGUOUS.value,
+                    task_status=TaskStatus.AMBIGUOUS_TARGET,
+                    reasoning=f"Referential target '{target_name or 'it'}' is ambiguous with {len(detected_objs)} visual candidates and no pointing gesture.",
+                    modality_contributions={"voice": voice_conf, "vision": vision_output.confidence},
+                    metadata={"ambiguous_candidates": [o.label for o in detected_objs]},
+                )
+            elif len(detected_objs) == 1:
+                single_obj = detected_objs[0]
+                return MultimodalTask(
+                    action=action,
+                    target_object=single_obj.label,
+                    target_confirmed=True,
+                    target_confidence=single_obj.confidence,
+                    spatial_sector=single_obj.spatial_sector,
+                    proximity=single_obj.proximity,
+                    urgency=intent.urgency,
+                    confidence=fused_conf,
+                    grounding_status=(
+                        GroundingStatus.HIGH_CONFIDENCE
+                        if single_obj.confidence >= self.high_confidence_threshold
+                        else GroundingStatus.LOW_CONFIDENCE
+                    ),
+                    task_status=TaskStatus.VALID,
+                    matched_visual_object=single_obj,
+                    reasoning=f"Referential target '{target_name or 'it'}' resolved to sole visual object '{single_obj.label}'.",
+                    modality_contributions={"voice": voice_conf, "vision": single_obj.confidence},
+                )
+            else:
+                return MultimodalTask(
+                    action=action,
+                    target_object=target_name or "it",
+                    target_confirmed=False,
+                    urgency=intent.urgency,
+                    confidence=fused_conf,
+                    grounding_status=GroundingStatus.UNRESOLVED,
+                    task_status=TaskStatus.TARGET_NOT_FOUND,
+                    reasoning=f"Referential target '{target_name}' passed to MemoryAgent for cross-turn context resolution.",
+                    modality_contributions={"voice": voice_conf, "vision": vision_output.confidence},
+                )
 
         # Target requested by voice was NOT found in vision
         if target_name and matched_obj is None:
@@ -690,6 +885,7 @@ class MultimodalFusionEngine:
                 target_confirmed=False,
                 urgency=intent.urgency,
                 confidence=voice_conf * 0.5,
+                grounding_status=GroundingStatus.UNRESOLVED,
                 task_status=TaskStatus.TARGET_NOT_FOUND,
                 reasoning=(
                     f"Voice command requested target '{target_name}', but no matching object was "
@@ -720,10 +916,12 @@ class MultimodalFusionEngine:
                         action=action,
                         target_object=target_name,
                         target_confirmed=True,
+                        target_confidence=vision_conf,
                         spatial_sector=matched_obj.spatial_sector,
                         proximity=matched_obj.proximity,
                         urgency=intent.urgency,
                         confidence=fused_conf * 0.7,
+                        grounding_status=GroundingStatus.MODALITY_CONFLICT,
                         task_status=TaskStatus.MODALITY_CONFLICT,
                         matched_visual_object=matched_obj,
                         reasoning=(
@@ -733,16 +931,24 @@ class MultimodalFusionEngine:
                         modality_contributions=modality_contrib,
                     )
 
-            # Low confidence check
+            # High / Low confidence check
+            grounding_st = (
+                GroundingStatus.HIGH_CONFIDENCE
+                if vision_conf >= self.high_confidence_threshold
+                else GroundingStatus.LOW_CONFIDENCE
+            )
+
             if fused_conf < self.min_confidence_threshold or vision_conf < self.min_confidence_threshold:
                 return MultimodalTask(
                     action=action,
                     target_object=target_name,
                     target_confirmed=True,
+                    target_confidence=vision_conf,
                     spatial_sector=matched_obj.spatial_sector,
                     proximity=matched_obj.proximity,
                     urgency=intent.urgency,
                     confidence=fused_conf,
+                    grounding_status=grounding_st,
                     task_status=TaskStatus.LOW_CONFIDENCE,
                     matched_visual_object=matched_obj,
                     reasoning=f"Detection confidence for '{target_name}' ({vision_conf:.2f}) is below threshold.",
@@ -753,10 +959,12 @@ class MultimodalFusionEngine:
                 action=action,
                 target_object=target_name,
                 target_confirmed=True,
+                target_confidence=vision_conf,
                 spatial_sector=matched_obj.spatial_sector,
                 proximity=matched_obj.proximity,
                 urgency=intent.urgency,
                 confidence=fused_conf,
+                grounding_status=grounding_st,
                 task_status=TaskStatus.VALID,
                 matched_visual_object=matched_obj,
                 reasoning=(
@@ -775,6 +983,7 @@ class MultimodalFusionEngine:
             proximity=None,
             urgency=intent.urgency,
             confidence=voice_conf,
+            grounding_status=GroundingStatus.HIGH_CONFIDENCE,
             task_status=TaskStatus.VALID,
             reasoning=f"Voice action '{action}' validated without specific target object requirement.",
             modality_contributions={"voice": voice_conf, "vision": vision_output.confidence},
@@ -804,6 +1013,7 @@ class MultimodalFusionEngine:
             spatial_sector=spatial,
             urgency=intent.urgency,
             confidence=voice_conf * 0.85,
+            grounding_status=GroundingStatus.UNRESOLVED,
             task_status=TaskStatus.VALID,
             reasoning=f"Interpreted from voice-only input: action '{action}', target '{intent.target_object}'.",
             modality_contributions={"voice": voice_conf},
@@ -821,6 +1031,7 @@ class MultimodalFusionEngine:
             target_object=None,
             target_confirmed=False,
             confidence=vision_output.confidence,
+            grounding_status=GroundingStatus.HIGH_CONFIDENCE,
             task_status=TaskStatus.VALID,
             reasoning=f"Passive scene perception: {n_objects} objects detected across sectors.",
             modality_contributions={"vision": vision_output.confidence},

@@ -325,6 +325,32 @@ class SafetyAgent(BaseAgent):
 
         final_reason = "; ".join(reasons) if reasons else "All safety checks passed."
 
+        # Demonstration output matching requirements
+        tgt_name = safety_input.task.target_object if safety_input.task else None
+        tgt_conf = (
+            safety_input.target_confidence
+            if safety_input.target_confidence is not None
+            else (safety_input.task.target_confidence if safety_input.task else None)
+        )
+        gest_conf = safety_input.task.metadata.get("gesture_confidence") if safety_input.task else None
+        grnd_st = None
+        if safety_input.task and safety_input.task.grounding_status:
+            grnd_st = safety_input.task.referential_grounding_status or (
+                safety_input.task.grounding_status.value
+                if hasattr(safety_input.task.grounding_status, "value")
+                else str(safety_input.task.grounding_status)
+            )
+
+        self._print_debug_safety(
+            target_name=tgt_name,
+            target_conf=tgt_conf,
+            gesture_conf=gest_conf,
+            grounding_status=grnd_st,
+            decision="HUMAN_CONFIRMATION_REQUIRED" if human_intervention_required else decision_type.value,
+            reason=final_reason,
+            human_required=human_intervention_required,
+        )
+
         safety_decision = SafetyDecision(
             decision=decision_type,
             risk_level=risk_level,
@@ -354,6 +380,33 @@ class SafetyAgent(BaseAgent):
             approved_for_execution=approved_for_execution,
             safety_state=self._previous_safety_state.value,
         )
+
+    def _print_debug_safety(
+        self,
+        target_name: Optional[str],
+        target_conf: Optional[float],
+        gesture_conf: Optional[float],
+        grounding_status: Optional[str],
+        decision: str,
+        reason: str,
+        human_required: bool,
+    ):
+        """Print structured Safety evaluation for demonstration."""
+        print("\n" + "=" * 50)
+        print("[SAFETY]")
+        print(f"  Target                : {target_name or 'None'}")
+        if target_conf is not None:
+            print(f"  Target Confidence     : {target_conf:.2f}")
+        if gesture_conf is not None:
+            print(f"  Gesture Confidence    : {gesture_conf:.2f}")
+        if grounding_status:
+            print(f"  Grounding Status      : {grounding_status}")
+        print(f"  Decision              : {decision}")
+        print(f"  Reason                : {reason}")
+        if human_required:
+            print("\n[HITL]")
+            print(f"  Human confirmation required before execution.")
+        print("=" * 50 + "\n", flush=True)
 
     def _reset(self) -> None:
         """Reset internal monitor state."""

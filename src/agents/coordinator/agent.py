@@ -46,12 +46,16 @@ class CoordinatorAgent(BaseAgent):
 
         if self.fusion_engine is None:
             min_conf = coord_cfg.get("min_confidence_threshold", 0.40)
+            high_conf = coord_cfg.get("high_confidence_threshold", 0.60)
+            ambig_thresh = coord_cfg.get("ambiguity_threshold", 0.10)
             v_weight = coord_cfg.get("voice_weight", 0.55)
             vis_weight = coord_cfg.get("vision_weight", 0.35)
             g_weight = coord_cfg.get("gesture_weight", 0.10)
             req_vis = coord_cfg.get("require_visual_target_confirmation", True)
             self.fusion_engine = MultimodalFusionEngine(
                 min_confidence_threshold=min_conf,
+                high_confidence_threshold=high_conf,
+                ambiguity_threshold=ambig_thresh,
                 voice_weight=v_weight,
                 vision_weight=vis_weight,
                 gesture_weight=g_weight,

@@ -118,6 +118,28 @@ def is_voice_active(audio: np.ndarray, energy_threshold: float = 0.005) -> bool:
     return calculate_rms_energy(audio) >= energy_threshold
 
 
+def filter_audio_dc_and_rumble(audio: np.ndarray, fs: int = 16000, cutoff: float = 80.0) -> np.ndarray:
+    """
+    Apply a zero-phase high-pass filter and remove DC offset to clean up live microphone signals.
+    Removes low-frequency rumble and DC bias that degrade Whisper ASR performance.
+    """
+    if audio is None or len(audio) < 16:
+        return audio if audio is not None else np.empty(0, dtype=np.float32)
+
+    # 1. Remove DC bias
+    centered = (audio - np.mean(audio)).astype(np.float32)
+
+    # 2. 80Hz high-pass filter using scipy.signal
+    try:
+        from scipy import signal
+        sos = signal.butter(4, cutoff, "hp", fs=fs, output="sos")
+        filtered = signal.sosfilt(sos, centered).astype(np.float32)
+        return filtered
+    except Exception:
+        # Fallback to mean subtraction if scipy is unavailable
+        return centered
+
+
 def normalize_audio(audio: np.ndarray, target_peak: float = 0.95) -> np.ndarray:
     """
     Normalize audio array to target peak amplitude.

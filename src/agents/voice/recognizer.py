@@ -116,6 +116,8 @@ class WhisperSpeechRecognizer(BaseSpeechRecognizer):
                     language=language if language != "auto" else None,
                     temperature=self.temperature,
                     fp16=False,
+                    condition_on_previous_text=False,
+                    initial_prompt="Human-robot interaction commands: pick up the bottle, stop, navigate, move, go.",
                 )
 
                 transcript = result.get("text", "").strip()

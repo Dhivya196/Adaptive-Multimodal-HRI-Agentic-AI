@@ -25,7 +25,7 @@ from pathlib import Path
 import sys
 import threading
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 import uuid
 
 import cv2
@@ -94,24 +94,29 @@ from src.utils.config import load_config
 
 
 class VisionWorker(threading.Thread):
-    """Background worker continuously capturing camera frames and running VisionAgent."""
+    """Background worker continuously capturing camera frames and running VisionAgent & GestureAgent."""
 
     def __init__(
         self,
         agent: VisionAgent,
         camera: CameraManager,
+        gesture_agent: Optional[GestureAgent] = None,
         target_fps: float = 8.0,
         enable_gui: bool = False,
     ):
         super().__init__(daemon=True, name="VisionWorker")
         self.agent = agent
         self.camera = camera
+        self.gesture_agent = gesture_agent
         self.target_fps = target_fps
         self.enable_gui = enable_gui
         self.running = False
 
         self._lock = threading.Lock()
         self._latest_output: Optional[VisionAgentOutput] = None
+        self._latest_gesture: Optional[GestureAgentOutput] = None
+        self._recent_gesture: Optional[GestureAgentOutput] = None
+        self._recent_gesture_time: float = 0.0
         self._latest_timestamp: float = 0.0
         self._latest_frame: Optional[np.ndarray] = None
         self._frame_id = 0
@@ -130,6 +135,16 @@ class VisionWorker(threading.Thread):
         with self._lock:
             return self._latest_output, self._latest_timestamp
 
+    def get_latest_gesture(self, max_lookback: float = 4.0) -> Tuple[Optional[GestureAgentOutput], float, Optional[np.ndarray]]:
+        """Thread-safely retrieve the latest or recent active gesture within lookback window and the frame."""
+        with self._lock:
+            now = time.time()
+            if self._latest_gesture and self._latest_gesture.is_gesture_detected and self._latest_gesture.gesture not in ("NO_GESTURE", "UNKNOWN"):
+                return self._latest_gesture, self._latest_timestamp, self._latest_frame
+            if self._recent_gesture and (now - self._recent_gesture_time <= max_lookback):
+                return self._recent_gesture, self._recent_gesture_time, self._latest_frame
+            return self._latest_gesture, self._latest_timestamp, self._latest_frame
+
     def run(self):
         interval = 1.0 / max(1.0, self.target_fps)
         while self.running:
@@ -143,6 +158,7 @@ class VisionWorker(threading.Thread):
             if ret and frame is not None:
                 self._frame_id += 1
                 try:
+                    # 1. Vision Perception
                     inp = VisionAgentInput(frame=frame, frame_id=self._frame_id, source_name="camera")
                     output = self.agent.process(inp)
                     # If synthetic camera is active and no detections produced by YOLO on drawing, provide synthetic demonstration objects
@@ -169,24 +185,37 @@ class VisionWorker(threading.Thread):
                         output.success = True
                         output.confidence = 0.88
 
+                    # 2. Gesture Perception (Continuous Live Tracking)
+                    gesture_out = None
+                    if self.gesture_agent is not None:
+                        try:
+                            g_inp = GestureAgentInput(frame=frame, frame_id=self._frame_id, source_name="camera")
+                            gesture_out = self.gesture_agent.process(g_inp)
+                        except Exception:
+                            gesture_out = None
+
                     now = time.time()
                     with self._lock:
                         self._latest_output = output
+                        self._latest_gesture = gesture_out
                         self._latest_timestamp = now
                         self._latest_frame = frame
+                        if gesture_out and gesture_out.is_gesture_detected and gesture_out.gesture not in ("NO_GESTURE", "UNKNOWN"):
+                            self._recent_gesture = gesture_out
+                            self._recent_gesture_time = now
 
                     if self.enable_gui:
-                        self._render_gui(frame, output)
+                        self._render_gui(frame, output, gesture_out)
                 except Exception as e:
                     import traceback
-                    print(f"[VISION WORKER ERROR]: {e}\n{traceback.format_exc()}", flush=True)
+                    print(f"[PERCEPTION WORKER ERROR]: {e}\n{traceback.format_exc()}", flush=True)
 
             elapsed = time.time() - start_t
             sleep_t = max(0.005, interval - elapsed)
             time.sleep(sleep_t)
 
-    def _render_gui(self, frame: np.ndarray, output: VisionAgentOutput):
-        """Render visualization overlay on camera frame."""
+    def _render_gui(self, frame: np.ndarray, output: VisionAgentOutput, gesture_out: Optional[GestureAgentOutput] = None):
+        """Render visualization overlay on camera frame with objects and 21 MediaPipe hand landmarks."""
         vis_frame = frame.copy()
         h, w = vis_frame.shape[:2]
 
@@ -197,6 +226,7 @@ class VisionWorker(threading.Thread):
         cv2.putText(vis_frame, "CENTER", (int(w * 0.45), 25), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (120, 120, 120), 1)
         cv2.putText(vis_frame, "RIGHT", (int(w * 0.88), 25), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (120, 120, 120), 1)
 
+        # Draw Vision Bounding Boxes
         for obj in output.detected_objects:
             if obj.bbox:
                 x1, y1, x2, y2 = int(obj.bbox.x1), int(obj.bbox.y1), int(obj.bbox.x2), int(obj.bbox.y2)
@@ -204,8 +234,49 @@ class VisionWorker(threading.Thread):
                 label = f"{obj.label} ({obj.confidence:.2f}) [{obj.spatial_sector.value}, {obj.proximity.value}]"
                 cv2.putText(vis_frame, label, (x1, max(20, y1 - 8)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 120), 2)
 
-        status = f"VisionAgent: {len(output.detected_objects)} object(s) detected"
-        cv2.putText(vis_frame, status, (10, h - 15), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 255), 2)
+        # Draw MediaPipe Hand Landmarks and Skeletal Connections
+        HAND_CONNECTIONS = [
+            (0, 1), (1, 2), (2, 3), (3, 4),        # Thumb
+            (0, 5), (5, 6), (6, 7), (7, 8),        # Index
+            (5, 9), (9, 10), (10, 11), (11, 12),   # Middle
+            (9, 13), (13, 14), (14, 15), (15, 16), # Ring
+            (13, 17), (17, 18), (18, 19), (19, 20),# Pinky
+            (0, 17)                                # Palm base
+        ]
+
+        gesture_status_str = "Gesture: NO_GESTURE"
+        if gesture_out and gesture_out.recognized_gestures:
+            for rec in gesture_out.recognized_gestures:
+                lms = rec.metadata.get("landmarks", [])
+                if len(lms) >= 21:
+                    # Draw bones
+                    for start_idx, end_idx in HAND_CONNECTIONS:
+                        pt1 = lms[start_idx]
+                        pt2 = lms[end_idx]
+                        p1 = (int(pt1[0] * w), int(pt1[1] * h))
+                        p2 = (int(pt2[0] * w), int(pt2[1] * h))
+                        cv2.line(vis_frame, p1, p2, (0, 255, 255), 2)
+
+                    # Draw keypoints
+                    for idx, pt in enumerate(lms):
+                        px, py = int(pt[0] * w), int(pt[1] * h)
+                        col = (255, 120, 0) if idx == 8 else (0, 0, 255)
+                        cv2.circle(vis_frame, (px, py), 4, col, -1)
+
+                if rec.bbox:
+                    bx1, by1, bx2, by2 = int(rec.bbox.x1), int(rec.bbox.y1), int(rec.bbox.x2), int(rec.bbox.y2)
+                    cv2.rectangle(vis_frame, (bx1, by1), (bx2, by2), (255, 200, 0), 2)
+                    g_val = rec.gesture.value if hasattr(rec.gesture, "value") else str(rec.gesture)
+                    g_dir = rec.direction.value if hasattr(rec.direction, "value") else str(rec.direction)
+                    cv2.putText(vis_frame, f"{g_val} [{g_dir}] ({rec.confidence:.2f})", (bx1, max(20, by1 - 8)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 200, 0), 2)
+
+            top_g = gesture_out.recognized_gestures[0]
+            g_val = top_g.gesture.value if hasattr(top_g.gesture, "value") else str(top_g.gesture)
+            g_dir = top_g.direction.value if hasattr(top_g.direction, "value") else str(top_g.direction)
+            gesture_status_str = f"Gesture: {g_val} ({g_dir}, conf={top_g.confidence:.2f})"
+
+        status = f"Vision: {len(output.detected_objects)} obj(s) | {gesture_status_str}"
+        cv2.putText(vis_frame, status, (10, h - 15), cv2.FONT_HERSHEY_SIMPLEX, 0.50, (0, 255, 255), 2)
         cv2.imshow("HRI Real-Time Vision Feed", vis_frame)
         cv2.waitKey(1)
 
@@ -248,6 +319,8 @@ class RealTimeHRIOrchestrator:
         max_vision_age: float = 3.0,
         safety_demo_distance: Optional[float] = None,
         enable_gui: bool = False,
+        debug: bool = False,
+        audio_device: Optional[Union[int, str]] = None,
         config_path: Optional[str] = None,
     ):
         self.mode = mode
@@ -255,6 +328,8 @@ class RealTimeHRIOrchestrator:
         self.max_vision_age = max_vision_age
         self.safety_demo_distance = safety_demo_distance
         self.enable_gui = enable_gui
+        self.debug = debug
+        self.audio_device = audio_device
 
         self.logger = setup_logger("RealTimeHRI")
 
@@ -332,8 +407,14 @@ class RealTimeHRIOrchestrator:
         self.controller_agent = RobotControllerAgent(config=ctrl_config, controller=controller)
         self.controller_agent.initialize()
 
-        # Audio capture helper
-        self.mic_recorder = MicrophoneRecorder()
+        # Audio capture helper with DC offset removal and adaptive VAD
+        self.mic_recorder = MicrophoneRecorder(
+            energy_threshold=0.012,
+            silence_duration=1.5,
+            max_duration=10.0,
+            device=self.audio_device,
+            debug=self.debug,
+        )
 
         # Camera manager & background vision worker
         cam_cfg = self.config.get("camera", {})
@@ -357,6 +438,7 @@ class RealTimeHRIOrchestrator:
         self.vision_worker = VisionWorker(
             agent=self.vision_agent,
             camera=self.camera_manager,
+            gesture_agent=self.gesture_agent,
             target_fps=8.0,
             enable_gui=self.enable_gui,
         )
@@ -376,6 +458,8 @@ class RealTimeHRIOrchestrator:
         """Cleanly shutdown all background workers and agents."""
         self.logger.info("Shutting down RealTime HRI Orchestrator...")
         self.vision_worker.stop_worker()
+        if self.vision_worker.is_alive():
+            self.vision_worker.join(timeout=1.0)
         self.camera_manager.release()
         self.vision_agent.shutdown()
         self.gesture_agent.shutdown()
@@ -413,6 +497,7 @@ class RealTimeHRIOrchestrator:
         manual_vision: Optional[VisionAgentOutput] = None,
         manual_gesture: Optional[GestureAgentOutput] = None,
         safety_override_dist: Optional[float] = None,
+        is_live_audio: bool = False,
     ) -> Dict[str, Any]:
         """
         Execute the full chronological multi-agent pipeline for a single command.
@@ -428,7 +513,10 @@ class RealTimeHRIOrchestrator:
         # 1. VOICE AGENT OUTPUT
         # -------------------------------------------------------------
         print("\n" + "-" * 70)
-        print("  [VOICE AGENT]")
+        if not is_live_audio:
+            print("  [VOICE] FALLBACK / CLI TEXT INPUT")
+        else:
+            print("  [VOICE]")
         print("-" * 70)
         transcript = voice_output.transcript or "(None)"
         intent_action = voice_output.speech_intent.action if voice_output.speech_intent else "unknown"
@@ -436,47 +524,105 @@ class RealTimeHRIOrchestrator:
         intent_urgency = voice_output.speech_intent.urgency.value if voice_output.speech_intent else "NORMAL"
         voice_conf = voice_output.confidence
 
-        print(f"  • Transcript : \"{transcript}\"")
-        print(f"  • Intent     : {intent_action}")
-        print(f"  • Target     : {intent_target}")
-        print(f"  • Urgency    : {intent_urgency}")
-        print(f"  • Confidence : {voice_conf:.2f}")
+        v_rec = getattr(self.voice_agent, "recognizer", None)
+        v_model_name = getattr(v_rec, "model_name", "base") if v_rec else "mock"
+        v_device = getattr(v_rec, "device", "cpu") if v_rec else "cpu"
+        v_backend_str = f"Whisper {v_model_name} ({v_device})" if "Whisper" in type(v_rec).__name__ else type(v_rec).__name__
+
+        audio_received_str = "YES" if is_live_audio else "NO"
+        print(f"  • Audio received : {audio_received_str}")
+        print(f"  • Model loaded   : {v_backend_str}")
+        print(f"  • Transcription  : \"{transcript}\"")
+        print(f"  • Intent         : {intent_action}")
+        print(f"  • Target         : {intent_target}")
+        print(f"  • Urgency        : {intent_urgency}")
+        print(f"  • Confidence     : {voice_conf:.2f}")
 
         # -------------------------------------------------------------
         # 2. GESTURE AGENT OUTPUT
         # -------------------------------------------------------------
         print("\n" + "-" * 70)
-        print("  [GESTURE AGENT]")
+        print("  [GESTURE]")
         print("-" * 70)
         gesture_output: Optional[GestureAgentOutput] = None
+        has_cam_frame = False
+        cur_frame = None
+        gesture_age_ms = 0.0
+
         if manual_gesture is not None:
             gesture_output = manual_gesture
             source_str = "CLI SIMULATION"
+            has_cam_frame = True
         else:
             rec_type = type(getattr(self.gesture_agent, "recognizer", None)).__name__
             source_str = "HaGRID" if "Hagrid" in rec_type else ("MediaPipe/Lightweight" if "Lightweight" in rec_type else "GestureAgent")
-            with self.vision_worker._lock:
-                cur_frame = self.vision_worker._latest_frame
-                cur_frame_id = self.vision_worker._frame_id
-            if cur_frame is not None:
-                try:
-                    g_inp = GestureAgentInput(frame=cur_frame, frame_id=cur_frame_id, source_name="camera")
-                    gesture_output = self.gesture_agent.process(g_inp)
-                except Exception as e:
-                    self.logger.debug(f"Live gesture inference skipped: {e}")
-                    gesture_output = None
+            gesture_output, g_time, cur_frame = self.vision_worker.get_latest_gesture(max_lookback=4.0)
+            has_cam_frame = (cur_frame is not None)
+            if g_time > 0.0:
+                gesture_age_ms = (time.time() - g_time) * 1000.0
 
-        if gesture_output and gesture_output.confidence > 0.0:
+        if not has_cam_frame and manual_gesture is None:
+            print("  • Frame status : Frame unavailable")
+        else:
+            print(f"  • Frame status : Available ({gesture_age_ms:.1f} ms age)")
+
+        if gesture_output and gesture_output.confidence > 0.0 and gesture_output.is_gesture_detected:
             g_name = gesture_output.gesture
             g_dir = gesture_output.direction or "NONE"
-            print(f"  • Source     : {source_str}")
-            print(f"  • Gesture    : {g_name}")
-            print(f"  • Direction  : {g_dir}")
-            print(f"  • Confidence : {gesture_output.confidence:.2f}")
+            print(f"  • Source       : {source_str}")
+            print(f"  • Gesture      : {g_name}")
+            print(f"  • Direction    : {g_dir}")
+            print(f"  • Confidence   : {gesture_output.confidence:.2f}")
         else:
-            print(f"  • Source     : {source_str}")
-            print("  • Gesture    : NONE / NOT DETECTED")
-            print("  • Confidence : 0.00")
+            print(f"  • Source       : {source_str}")
+            print("  • Gesture      : NONE / NOT DETECTED")
+            print("  • Direction    : NONE")
+            print("  • Confidence   : 0.00")
+
+        # Detailed [GESTURE TRACE] in debug mode
+        if self.debug:
+            print("\n  [GESTURE TRACE]")
+            print(f"    Frame received by GestureAgent : {'YES' if has_cam_frame else 'NO'}")
+            if cur_frame is not None:
+                print(f"    Frame shape                    : {cur_frame.shape}")
+                print(f"    Frame dtype                    : {cur_frame.dtype}")
+                print(f"    Frame color format             : BGR (OpenCV converted to RGB for MediaPipe)")
+            else:
+                print(f"    Frame shape                    : (N/A)")
+                print(f"    Frame dtype                    : (N/A)")
+                print(f"    Frame color format             : (N/A)")
+            print(f"    Gesture frame age              : {gesture_age_ms:.1f} ms")
+
+            hand_det_str = "NO_HANDS_DETECTED"
+            num_hands = 0
+            num_landmarks = 0
+            if gesture_output and gesture_output.recognized_gestures:
+                top_rec = gesture_output.recognized_gestures[0]
+                num_hands = top_rec.metadata.get("hand_count", 1)
+                lms = top_rec.metadata.get("landmarks", [])
+                num_landmarks = len(lms)
+                hand_det_str = f"HAND_DETECTED ({num_hands} hand)"
+
+            print(f"    Hand detection result          : {hand_det_str}")
+            print(f"    Number of hands                : {num_hands}")
+            print(f"    Number of landmarks            : {num_landmarks}")
+            print(f"    Classifier result              : {gesture_output.gesture if gesture_output else 'NO_GESTURE'} (conf={gesture_output.confidence if gesture_output else 0.0:.2f})")
+            print(f"    Final GestureAgent result      : {gesture_output.gesture if gesture_output else 'NO_GESTURE'} ({gesture_output.direction if gesture_output else 'NONE'})")
+
+        # Print Landmark Debug Details if present
+        if gesture_output and gesture_output.recognized_gestures:
+            top_rec = gesture_output.recognized_gestures[0]
+            dbg = top_rec.metadata.get("debug")
+            if dbg and (self.debug or top_rec.gesture != "NO_GESTURE"):
+                print("\n  [GESTURE DEBUG]")
+                print(f"    Hand detected          : YES")
+                print(f"    Hand landmarks         : 21 keypoints")
+                print(f"    Wrist position         : {dbg.get('wrist', '(N/A)')}")
+                print(f"    Index finger extended  : {'YES' if dbg.get('index_extended') else 'NO'}")
+                print(f"    Middle finger extended : {'YES' if dbg.get('middle_extended') else 'NO'}")
+                print(f"    Ring finger extended   : {'YES' if dbg.get('ring_extended') else 'NO'}")
+                print(f"    Pinky extended         : {'YES' if dbg.get('pinky_extended') else 'NO'}")
+                print(f"    Pointing vector        : dx={dbg.get('dx', 0):.3f}, dy={dbg.get('dy', 0):.3f} -> {top_rec.gesture} ({top_rec.direction})")
 
         # -------------------------------------------------------------
         # 3. VISION SNAPSHOT SYNCHRONIZATION
@@ -645,13 +791,13 @@ class RealTimeHRIOrchestrator:
         if was_resolved:
             print(f"  • Pronoun Grounding: True ('{original_target}' -> '{resolved_target}')")
         else:
-            print("  • Pronoun Grounding: Not needed (Explicit target provided)")
+            print("  • Pronoun Grounding: Not needed (Explicit or Gesture Grounded target)")
 
         # Verify we only block if an explicit pronoun was requested but remained unresolved
         if is_pronoun_target and (not resolved_target or resolved_target.strip().lower() in MemoryAgent.REFERENTIAL_PRONOUNS):
             print("\n" + "=" * 70)
             print("  [TASK RESULT]: BLOCKED AT MEMORY GROUNDING")
-            print(f"  Reason: Target pronoun '{original_target}' could not be resolved from historical context.")
+            print(f"  Reason: Target pronoun '{original_target}' could not be resolved from multimodal or historical context.")
             print("=" * 70 + "\n")
             return {
                 "success": False,
@@ -666,7 +812,7 @@ class RealTimeHRIOrchestrator:
 
         # Construct fully grounded task for planning and safety verification
         matched_obj = None
-        if vision_output and vision_output.detected_objects:
+        if vision_output and vision_output.detected_objects and resolved_target:
             for obj in vision_output.detected_objects:
                 if resolved_target.lower() in obj.label.lower() or obj.label.lower() in resolved_target.lower():
                     matched_obj = obj
@@ -758,6 +904,7 @@ class RealTimeHRIOrchestrator:
 
         all_steps_executed = True
         step_execution_logs = []
+        last_safety_decision = None
 
         for idx, step in enumerate(plan.steps, start=1):
             act_name = step.action.value if hasattr(step.action, "value") else str(step.action)
@@ -779,6 +926,7 @@ class RealTimeHRIOrchestrator:
             timings[f"safety_step_{idx}_ms"] = (time.perf_counter() - t0) * 1000.0
 
             decision = safety_output.safety_decision
+            last_safety_decision = decision
             is_approved = safety_output.approved_for_execution
             decision_type = (
                 decision.decision.value
@@ -853,7 +1001,47 @@ class RealTimeHRIOrchestrator:
         print(f"  • Total End-to-End Pipeline  : {total_elapsed_ms:.2f} ms")
 
         # -------------------------------------------------------------
-        # 8. TASK RESULT BANNER
+        # 8. DEBUG DIAGNOSTIC SUMMARY (If --debug is enabled)
+        # -------------------------------------------------------------
+        if self.debug:
+            print("\n" + "=" * 70)
+            print("  [HRI MULTIMODAL DEBUG TRACE]")
+            print("=" * 70)
+            print("  CAMERA")
+            print(f"    frame captured: {'YES' if (has_cam_frame or manual_vision is not None) else 'NO'}")
+            print("  VISION")
+            det_summary = ", ".join([f"{o.label} ({o.spatial_sector.value}, {o.proximity.value})" for o in vision_output.detected_objects]) if vision_output.detected_objects else "None"
+            print(f"    objects: {det_summary}")
+            print("  GESTURE")
+            print(f"    source: {source_str}")
+            print(f"    gesture: {gesture_output.gesture if gesture_output else 'NONE'}")
+            print(f"    direction: {gesture_output.direction if gesture_output else 'NONE'}")
+            print(f"    confidence: {gesture_output.confidence if gesture_output else 0.0:.2f}")
+            print("  AUDIO")
+            print(f"    device: {self.mic_recorder.get_input_device_name()}")
+            print(f"    speech detected: {'YES' if is_live_audio else 'NO (CLI input)'}")
+            print("  VOICE")
+            print(f"    transcript: \"{transcript}\"")
+            print(f"    intent: {intent_action}")
+            print(f"    target: {intent_target}")
+            print("  COORDINATOR")
+            print(f"    target: {fused_task.target_object if fused_task else 'None'}")
+            print(f"    status: {task_status.value if hasattr(task_status, 'value') else task_status}")
+            print(f"    sector: {sec_val}")
+            print("  MEMORY")
+            print(f"    resolved target: {resolved_target}")
+            print("  PLANNER")
+            print(f"    plan id: {plan.plan_id}")
+            print(f"    total steps: {len(plan.steps)}")
+            print("  SAFETY")
+            risk_str = last_safety_decision.risk_level.value if last_safety_decision and hasattr(last_safety_decision.risk_level, 'value') else 'UNKNOWN'
+            dec_str = last_safety_decision.decision.value if last_safety_decision and hasattr(last_safety_decision.decision, 'value') else 'UNKNOWN'
+            print(f"    risk level: {risk_str}")
+            print(f"    decision: {dec_str}")
+            print("=" * 70)
+
+        # -------------------------------------------------------------
+        # 9. TASK RESULT BANNER
         # -------------------------------------------------------------
         print("\n" + "=" * 70)
         if all_steps_executed:
@@ -936,13 +1124,27 @@ class RealTimeHRIOrchestrator:
             manual_vision=manual_v,
             manual_gesture=manual_g,
             safety_override_dist=safety_dist,
+            is_live_audio=False,
         )
 
     def run_interactive_loop(self):
         """Interactive live demonstration loop listening for voice or keyboard input."""
+        dev_info = self.mic_recorder.get_input_device_info()
+        dev_name = dev_info.get("name", "Default Microphone")
+        sample_rate = self.mic_recorder.sample_rate
+
         print("\n" + "=" * 70)
         print("  HRI LIVE DEMONSTRATION READY")
-        print("  Say a command into the microphone (e.g. 'Pick up the bottle', 'Stop').")
+        print("=" * 70)
+        print("\n[AUDIO DEVICE]")
+        print(f"  Index          : {dev_info.get('index')}")
+        print(f"  Name           : {dev_name}")
+        print(f"  Input channels : {dev_info.get('channels')}")
+        print(f"  Sample rate    : {dev_info.get('sample_rate')} Hz")
+        print(f"  VAD Threshold  : {self.mic_recorder.energy_threshold:.4f} RMS")
+        print(f"  Silence Window : {self.mic_recorder.silence_duration:.1f} s")
+        print(f"  Max Duration   : {self.mic_recorder.max_duration:.1f} s")
+        print("\n  Say a command into the microphone (e.g. 'Pick up the bottle', 'Stop').")
         print("  Type 'exit' or press Ctrl+C to quit.")
         print("=" * 70 + "\n")
 
@@ -954,30 +1156,65 @@ class RealTimeHRIOrchestrator:
         while True:
             try:
                 if has_mic:
-                    print("[AUDIO] Listening on microphone (speak now)...")
+                    print("\n[AUDIO]")
+                    print(f"Input device: {dev_name}")
+                    print(f"Sample rate: {sample_rate} Hz")
+                    print("Recording started")
+
+                    speech_detected = False
+
+                    def _on_speech():
+                        nonlocal speech_detected
+                        speech_detected = True
+                        print("[AUDIO] Speech detected: YES (Recording phrase...)")
+
                     audio_buf = self.mic_recorder.record_phrase(
-                        on_speech_start=lambda: print("[AUDIO] Speech activity detected! Recording..."),
-                        timeout=10.0,
+                        on_speech_start=_on_speech,
+                        timeout=8.0,
+                        show_debug=self.debug,
                     )
+                    stop_reason = getattr(self.mic_recorder, "last_stop_reason", "completed")
+                    print(f"\n[AUDIO]\nRecording stopped\nReason: {stop_reason}")
+
                     if audio_buf is not None and len(audio_buf) > 0:
-                        print("[AUDIO] Processing captured speech audio via VoiceAgent Whisper...")
+                        duration = len(audio_buf) / sample_rate
+                        rms_val = float(np.sqrt(np.mean(audio_buf ** 2)))
+                        min_val = float(np.min(audio_buf))
+                        max_val = float(np.max(audio_buf))
+
+                        print(f"Audio samples: {len(audio_buf)}")
+                        print(f"Duration: {duration:.2f} seconds")
+                        print(f"RMS: {rms_val:.5f}")
+                        print(f"Min: {min_val:.4f}")
+                        print(f"Max: {max_val:.4f}")
+
                         voice_inp = VoiceAgentInput(
                             audio_data=audio_buf,
                             audio_format=AudioFormat.NUMPY_FLOAT32,
-                            sample_rate=16000,
+                            sample_rate=sample_rate,
                         )
                         voice_out = self.voice_agent.process(voice_inp)
                         if voice_out.transcript:
-                            self.execute_command_pipeline(voice_out)
+                            self.execute_command_pipeline(voice_out, is_live_audio=True)
                         else:
-                            print("[VOICE] No speech transcribed in audio chunk.\n")
+                            print("\n[VOICE] TRANSCRIPTION FAILURE")
+                            print("Audio received: YES")
+                            print("Transcription: \"\" (No speech recognized in audio buffer)")
+                            print("Intent: none")
+                            print("Target: None")
+                            print("Confidence: 0.00\n")
                     else:
-                        # If silence timeout, prompt text fallback
-                        cmd = input("[TEXT INPUT] Enter command (or press Enter to listen again, 'exit' to quit): ").strip()
-                        if cmd.lower() in ("exit", "quit", "q"):
-                            break
-                        if cmd:
-                            self.run_single_text_command(cmd)
+                        print("Duration: 0.00 seconds")
+                        if stop_reason == "initial silence timeout":
+                            print("[AUDIO] Speech detected: NO (Silence timeout)")
+                            print("\n[VOICE] FALLBACK / CLI TEXT INPUT")
+                            cmd = input("[TEXT INPUT] Enter command (or press Enter to listen again, 'exit' to quit): ").strip()
+                            if cmd.lower() in ("exit", "quit", "q"):
+                                break
+                            if cmd:
+                                self.run_single_text_command(cmd)
+                        else:
+                            print(f"[AUDIO] MICROPHONE FAILURE: {stop_reason}\n")
                 else:
                     cmd = input("HRI Command > ").strip()
                     if cmd.lower() in ("exit", "quit", "q"):
@@ -1045,6 +1282,17 @@ def parse_args():
         help="Disable OpenCV visual camera window overlay",
     )
     parser.add_argument(
+        "--debug",
+        action="store_true",
+        default=False,
+        help="Enable verbose HRI debug diagnostics across all sensor and agent pipelines",
+    )
+    parser.add_argument(
+        "--audio-device",
+        default=None,
+        help="Audio input device index or name (e.g. 0, 'hw:0,0', 'pulse', 'default')",
+    )
+    parser.add_argument(
         "--config",
         default=None,
         help="Path to custom config YAML",
@@ -1056,12 +1304,22 @@ def main():
     args = parse_args()
     enable_gui = args.gui and not args.no_gui
 
+    # Parse audio device index if integer given
+    dev_arg = None
+    if args.audio_device is not None:
+        try:
+            dev_arg = int(args.audio_device)
+        except ValueError:
+            dev_arg = args.audio_device
+
     orchestrator = RealTimeHRIOrchestrator(
         mode=args.mode,
         cmd_vel_topic=args.cmd_vel_topic,
         max_vision_age=args.max_vision_age,
         safety_demo_distance=args.safety_demo,
         enable_gui=enable_gui,
+        debug=args.debug,
+        audio_device=dev_arg,
         config_path=args.config,
     )
 

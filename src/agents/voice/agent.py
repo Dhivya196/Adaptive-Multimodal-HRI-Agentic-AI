@@ -8,6 +8,7 @@ import numpy as np
 from src.agents.base import BaseAgent
 from src.agents.voice.audio_utils import (
     calculate_rms_energy,
+    filter_audio_dc_and_rumble,
     is_voice_active,
     load_audio_file,
     pcm_bytes_to_float32,
@@ -266,7 +267,7 @@ class VoiceAgent(BaseAgent):
             )
 
         # ---------------------------------------------------------
-        # 3. Audio Validation & VAD
+        # 3. Audio Validation, Filtering & VAD
         # ---------------------------------------------------------
         if audio_array is None or len(audio_array) == 0:
             return VoiceAgentOutput(
@@ -284,6 +285,13 @@ class VoiceAgent(BaseAgent):
                 language=language,
                 confidence=0.0,
             )
+
+        # Remove DC bias & low-frequency noise (e.g. 80Hz rumble)
+        audio_array = filter_audio_dc_and_rumble(audio_array, fs=sample_rate)
+        # Normalize peak amplitude safely if non-silent
+        peak_amp = float(np.max(np.abs(audio_array))) if len(audio_array) > 0 else 0.0
+        if peak_amp > 0.01:
+            audio_array = (audio_array / max(1.0, peak_amp)).astype(np.float32)
 
         # Calculate energy and duration
         rms_energy = calculate_rms_energy(audio_array)

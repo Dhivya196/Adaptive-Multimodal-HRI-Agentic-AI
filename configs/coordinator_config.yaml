@@ -6,6 +6,12 @@ coordinator:
   # Minimum confidence threshold (below this, marked as LOW_CONFIDENCE)
   min_confidence_threshold: 0.40
 
+  # High confidence threshold for autonomous referential grounding
+  high_confidence_threshold: 0.60
+
+  # Ambiguity delta threshold for candidates in the same sector
+  ambiguity_threshold: 0.10
+
   # Whether targets requested by voice must be confirmed by visual perception
   require_visual_target_confirmation: true
 

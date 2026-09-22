@@ -153,7 +153,7 @@ class LightweightGestureRecognizer(BaseGestureRecognizer):
         middle=9..12, ring=13..16, pinky=17..20).
         Coordinates can be (x, y) or (x, y, z) normalized or pixel values.
         """
-        if not landmarks or len(landmarks) < 21:
+        if landmarks is None or len(landmarks) < 21:
             return RecognizedGesture(
                 gesture=GestureType.UNKNOWN,
                 direction=GestureDirection.UNKNOWN,
@@ -163,7 +163,7 @@ class LightweightGestureRecognizer(BaseGestureRecognizer):
         # Convert landmarks to simple (x, y) list
         points = []
         for pt in landmarks:
-            if isinstance(pt, (list, tuple)) and len(pt) >= 2:
+            if isinstance(pt, (list, tuple, np.ndarray)) and len(pt) >= 2:
                 points.append((float(pt[0]), float(pt[1])))
             elif hasattr(pt, "x") and hasattr(pt, "y"):
                 points.append((float(pt.x), float(pt.y)))
@@ -172,71 +172,73 @@ class LightweightGestureRecognizer(BaseGestureRecognizer):
 
         wrist = points[0]
         thumb_tip = points[4]
-        index_tip = points[8]
+        index_mcp = points[5]
         index_pip = points[6]
-        middle_tip = points[12]
+        index_tip = points[8]
+        middle_mcp = points[9]
         middle_pip = points[10]
-        ring_tip = points[16]
+        middle_tip = points[12]
+        ring_mcp = points[13]
         ring_pip = points[14]
-        pinky_tip = points[20]
+        ring_tip = points[16]
+        pinky_mcp = points[17]
         pinky_pip = points[18]
+        pinky_tip = points[20]
 
-        # Check extended fingers: tip is further from wrist than PIP joint
-        def is_extended(tip, pip, origin=wrist):
-            d_tip = (tip[0] - origin[0]) ** 2 + (tip[1] - origin[1]) ** 2
-            d_pip = (pip[0] - origin[0]) ** 2 + (pip[1] - origin[1]) ** 2
-            return d_tip > d_pip * 1.1
+        # Robust finger extension check: compare tip distance to both MCP knuckle and wrist
+        def is_extended(tip, pip, mcp, origin=wrist):
+            d_tip_mcp = (tip[0] - mcp[0]) ** 2 + (tip[1] - mcp[1]) ** 2
+            d_pip_mcp = (pip[0] - mcp[0]) ** 2 + (pip[1] - mcp[1]) ** 2
+            d_tip_wrist = (tip[0] - origin[0]) ** 2 + (tip[1] - origin[1]) ** 2
+            d_pip_wrist = (pip[0] - origin[0]) ** 2 + (pip[1] - origin[1]) ** 2
+            return (d_tip_mcp > d_pip_mcp * 1.05) and (d_tip_wrist > d_pip_wrist * 1.02)
 
         thumb_extended = (thumb_tip[0] - wrist[0]) ** 2 + (thumb_tip[1] - wrist[1]) ** 2 > 0.01
-        index_extended = is_extended(index_tip, index_pip)
-        middle_extended = is_extended(middle_tip, middle_pip)
-        ring_extended = is_extended(ring_tip, ring_pip)
-        pinky_extended = is_extended(pinky_tip, pinky_pip)
+        index_extended = is_extended(index_tip, index_pip, index_mcp)
+        middle_extended = is_extended(middle_tip, middle_pip, middle_mcp)
+        ring_extended = is_extended(ring_tip, ring_pip, ring_mcp)
+        pinky_extended = is_extended(pinky_tip, pinky_pip, pinky_mcp)
 
         extended_count = sum([index_extended, middle_extended, ring_extended, pinky_extended])
 
-        # Calculate index pointing vector relative to index MCP/PIP
-        dx = index_tip[0] - index_pip[0]
-        dy = index_tip[1] - index_pip[1]
+        # Calculate index pointing vector relative to index MCP
+        dx = index_tip[0] - index_mcp[0]
+        dy = index_tip[1] - index_mcp[1]
 
         # Calculate bounding box in landmark space
         xs = [p[0] for p in points]
         ys = [p[1] for p in points]
         bbox = HandBBox(x1=min(xs), y1=min(ys), x2=max(xs), y2=max(ys))
 
-        # Heuristic 1: OK Gesture - Thumb tip touching index tip with middle, ring, pinky extended
-        d_thumb_index = (thumb_tip[0] - index_tip[0]) ** 2 + (thumb_tip[1] - index_tip[1]) ** 2
-        if d_thumb_index < 0.005 and middle_extended and ring_extended and pinky_extended:
-            return RecognizedGesture(
-                gesture=GestureType.OK,
-                direction=GestureDirection.NONE,
-                confidence=0.89,
-                bbox=bbox,
-            )
+        debug_info = {
+            "wrist": (round(wrist[0], 3), round(wrist[1], 3)),
+            "index_extended": index_extended,
+            "middle_extended": middle_extended,
+            "ring_extended": ring_extended,
+            "pinky_extended": pinky_extended,
+            "thumb_extended": thumb_extended,
+            "extended_count": extended_count,
+            "dx": round(dx, 3),
+            "dy": round(dy, 3),
+        }
 
-        # Heuristic 2: STOP - All fingers extended, open palm
-        if extended_count >= 4:
-            return RecognizedGesture(
-                gesture=GestureType.STOP,
-                direction=GestureDirection.NONE,
-                confidence=0.92,
-                bbox=bbox,
-                metadata={"extended_fingers": extended_count},
-            )
-
-        # Heuristic 3: ROCK Gesture - Index and pinky extended, middle and ring curled
+        # -------------------------------------------------------------
+        # PRIORITY 1: ROCK GESTURE (Index & pinky extended, middle & ring curled)
+        # -------------------------------------------------------------
         if index_extended and pinky_extended and not middle_extended and not ring_extended:
             return RecognizedGesture(
                 gesture=GestureType.ROCK,
                 direction=GestureDirection.NONE,
                 confidence=0.88,
                 bbox=bbox,
+                metadata={"debug": debug_info},
             )
 
-        # Heuristic 4: POINTING - Only index finger extended
+        # -------------------------------------------------------------
+        # PRIORITY 2: POINTING (Index extended, middle, ring, pinky curled)
+        # -------------------------------------------------------------
         if index_extended and not middle_extended and not ring_extended and not pinky_extended:
-            # Determine direction by horizontal and vertical displacement
-            if abs(dx) > abs(dy) * 0.8:
+            if abs(dx) > abs(dy) * 0.5:
                 if dx > 0.02:
                     direction = GestureDirection.RIGHT
                     gesture = GestureType.POINT_RIGHT
@@ -250,12 +252,27 @@ class LightweightGestureRecognizer(BaseGestureRecognizer):
             return RecognizedGesture(
                 gesture=gesture,
                 direction=direction,
-                confidence=0.90,
+                confidence=0.92,
                 bbox=bbox,
-                metadata={"dx": round(dx, 3), "dy": round(dy, 3)},
+                metadata={"dx": round(dx, 3), "dy": round(dy, 3), "debug": debug_info},
             )
 
-        # Heuristic 5: THUMBS_UP / THUMBS_DOWN - Fingers curled, thumb extended vertically
+        # -------------------------------------------------------------
+        # PRIORITY 3: OK GESTURE (Thumb tip touches index tip, others extended)
+        # -------------------------------------------------------------
+        d_thumb_index = (thumb_tip[0] - index_tip[0]) ** 2 + (thumb_tip[1] - index_tip[1]) ** 2
+        if d_thumb_index < 0.005 and middle_extended and ring_extended and pinky_extended:
+            return RecognizedGesture(
+                gesture=GestureType.OK,
+                direction=GestureDirection.NONE,
+                confidence=0.89,
+                bbox=bbox,
+                metadata={"debug": debug_info},
+            )
+
+        # -------------------------------------------------------------
+        # PRIORITY 4: THUMBS_UP / THUMBS_DOWN (All 4 fingers curled, thumb extended)
+        # -------------------------------------------------------------
         if extended_count == 0 and thumb_extended:
             d_thumb_y = thumb_tip[1] - wrist[1]
             if d_thumb_y < -0.05:
@@ -264,6 +281,7 @@ class LightweightGestureRecognizer(BaseGestureRecognizer):
                     direction=GestureDirection.UP,
                     confidence=0.88,
                     bbox=bbox,
+                    metadata={"debug": debug_info},
                 )
             elif d_thumb_y > 0.05:
                 return RecognizedGesture(
@@ -271,23 +289,40 @@ class LightweightGestureRecognizer(BaseGestureRecognizer):
                     direction=GestureDirection.DOWN,
                     confidence=0.88,
                     bbox=bbox,
+                    metadata={"debug": debug_info},
                 )
 
-        # Heuristic 6: WAVE - 3 or more fingers extended with significant horizontal wrist spread
+        # -------------------------------------------------------------
+        # PRIORITY 5: STOP (Open palm with all 4 fingers extended)
+        # -------------------------------------------------------------
+        if extended_count >= 4:
+            return RecognizedGesture(
+                gesture=GestureType.STOP,
+                direction=GestureDirection.NONE,
+                confidence=0.92,
+                bbox=bbox,
+                metadata={"extended_fingers": extended_count, "debug": debug_info},
+            )
+
+        # -------------------------------------------------------------
+        # PRIORITY 6: WAVE (3 or more fingers extended)
+        # -------------------------------------------------------------
         if extended_count >= 3:
             return RecognizedGesture(
                 gesture=GestureType.WAVE,
                 direction=GestureDirection.NONE,
                 confidence=0.82,
                 bbox=bbox,
+                metadata={"debug": debug_info},
             )
 
-        # Default fallback if landmarks are detected but do not form a distinct gesture
+        # Fallback if landmarks detected but no specific gesture template matched
         return RecognizedGesture(
             gesture=GestureType.UNKNOWN,
             direction=GestureDirection.UNKNOWN,
             confidence=0.45,
             bbox=bbox,
+            metadata={"debug": debug_info},
         )
 
     def recognize(
@@ -346,6 +381,7 @@ class LightweightGestureRecognizer(BaseGestureRecognizer):
 
                     recognized: List[RecognizedGesture] = []
                     if detection_result and detection_result.hand_landmarks:
+                        total_detected_hands = len(detection_result.hand_landmarks)
                         for idx, hand_lms in enumerate(detection_result.hand_landmarks):
                             rec = self._classify_from_landmarks(hand_lms)
                             
@@ -359,6 +395,15 @@ class LightweightGestureRecognizer(BaseGestureRecognizer):
                                 y2=min(float(h), max(ys)),
                             )
                             rec.metadata["source"] = "mediapipe_hand_landmarker"
+                            rec.metadata["hand_count"] = total_detected_hands
+                            rec.metadata["landmarks"] = [
+                                (
+                                    float(pt.x) if hasattr(pt, "x") else float(pt[0]),
+                                    float(pt.y) if hasattr(pt, "y") else float(pt[1]),
+                                    float(getattr(pt, "z", 0.0)) if hasattr(pt, "z") else (float(pt[2]) if len(pt) > 2 else 0.0),
+                                )
+                                for pt in hand_lms
+                            ]
 
                             # Handedness extraction if available
                             if (

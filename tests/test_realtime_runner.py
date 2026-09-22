@@ -16,6 +16,7 @@ from src.agents.vision.schemas import (
     SpatialSector,
     VisionAgentOutput,
 )
+from src.agents.gesture.schemas import GestureAgentOutput
 from src.agents.voice.schemas import AudioFormat, SpeechIntent, UrgencyLevel, VoiceAgentOutput
 from src.utils.audio_capture import MicrophoneRecorder
 
@@ -210,6 +211,58 @@ class TestRealTimeHRIOrchestrator(unittest.TestCase):
 
         # Without fresh vision confirmation of 'bottle', task should not proceed to successful execution
         self.assertFalse(result["success"])
+
+    def test_ungrounded_none_target_does_not_crash(self):
+        """Verify pipeline handles resolved_target=None without raising AttributeError."""
+        bottle_obj = DetectedObject(
+            object_id=1,
+            label="bottle",
+            confidence=0.90,
+            bbox=BoundingBox(100, 100, 200, 300),
+            spatial_sector=SpatialSector.RIGHT,
+            proximity=ProximityLevel.FAR,
+        )
+        mock_vision = VisionAgentOutput(
+            agent_name="VisionAgent",
+            agent_type="vision_agent",
+            success=True,
+            confidence=0.90,
+            detected_objects=[bottle_obj],
+        )
+
+        # Voice action pick_and_place with target_object=None
+        voice_output = VoiceAgentOutput(
+            transcript="pick something up",
+            confidence=0.95,
+            is_speech_detected=True,
+            speech_intent=SpeechIntent(
+                action="pick_and_place",
+                target_object=None,
+                urgency=UrgencyLevel.NORMAL,
+                confidence=0.95,
+            ),
+        )
+
+        # Non-pointing gesture STOP
+        gesture_output = GestureAgentOutput(
+            agent_name="GestureAgent",
+            agent_type="gesture_agent",
+            success=True,
+            gesture="STOP",
+            direction="NONE",
+            confidence=0.92,
+            is_gesture_detected=True,
+        )
+
+        result = self.orchestrator.execute_command_pipeline(
+            voice_output=voice_output,
+            manual_vision=mock_vision,
+            manual_gesture=gesture_output,
+        )
+
+        self.assertFalse(result["success"])
+        self.assertEqual(result.get("resolved_target"), None)
+        self.assertEqual(result.get("stage"), "PLANNER")
 
     def test_ros2_mode_mock_fallback(self):
         """Verify ROS2 mode initializes and falls back to mock when ROS2 node is not running."""

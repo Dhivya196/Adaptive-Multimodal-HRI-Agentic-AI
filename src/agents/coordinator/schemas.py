@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, TypedDict
+from typing import Any, Dict, List, Optional, TypedDict, Union
 
 from src.agents.gesture.schemas import GestureAgentOutput
 from src.agents.vision.schemas import DetectedObject, ProximityLevel, SpatialSector, VisionAgentOutput
@@ -20,6 +20,18 @@ class TaskStatus(str, Enum):
     AMBIGUOUS_TARGET = "AMBIGUOUS_TARGET"
 
 
+class GroundingStatus(str, Enum):
+    """Status of multimodal and referential grounding."""
+    HIGH_CONFIDENCE = "HIGH_CONFIDENCE"
+    LOW_CONFIDENCE = "LOW_CONFIDENCE"
+    LOW_CONFIDENCE_REFERENTIAL_GROUNDING = "LOW_CONFIDENCE_REFERENTIAL_GROUNDING"
+    REQUIRES_CONFIRMATION = "REQUIRES_CONFIRMATION"
+    AMBIGUOUS = "AMBIGUOUS"
+    MODALITY_CONFLICT = "MODALITY_CONFLICT"
+    EXPLICIT_TARGET_SPATIAL_CONFLICT = "EXPLICIT_TARGET_SPATIAL_CONFLICT"
+    UNRESOLVED = "UNRESOLVED"
+
+
 @dataclass
 class MultimodalTask:
     """Structured high-level task interpreted from multimodal perception inputs."""
@@ -30,6 +42,11 @@ class MultimodalTask:
     proximity: Optional[ProximityLevel] = None
     urgency: UrgencyLevel = UrgencyLevel.NORMAL
     confidence: float = 0.0
+    target_confidence: Optional[float] = None
+    grounding_status: Optional[Union[GroundingStatus, str]] = None
+    referential_grounding_status: Optional[str] = None
+    referential_grounding_score: Optional[float] = None
+    spatial_agreement: Optional[bool] = None
     task_status: TaskStatus = TaskStatus.INVALID_INPUT
     matched_visual_object: Optional[DetectedObject] = None
     reasoning: str = ""
@@ -49,6 +66,15 @@ class MultimodalTask:
             ),
             "urgency": self.urgency.value if isinstance(self.urgency, UrgencyLevel) else self.urgency,
             "confidence": round(self.confidence, 3),
+            "target_confidence": round(self.target_confidence, 3) if self.target_confidence is not None else None,
+            "grounding_status": (
+                self.grounding_status.value if isinstance(self.grounding_status, GroundingStatus) else self.grounding_status
+            ),
+            "referential_grounding_status": self.referential_grounding_status,
+            "referential_grounding_score": (
+                round(self.referential_grounding_score, 3) if self.referential_grounding_score is not None else None
+            ),
+            "spatial_agreement": self.spatial_agreement,
             "task_status": self.task_status.value if isinstance(self.task_status, TaskStatus) else self.task_status,
             "matched_visual_object": self.matched_visual_object.to_dict() if self.matched_visual_object else None,
             "reasoning": self.reasoning,

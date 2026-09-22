@@ -123,6 +123,24 @@ class TestGestureAgent(unittest.TestCase):
         self.assertAlmostEqual(output.confidence, 0.88)
         agent.shutdown()
 
+    def test_gesture_output_public_schema_and_summary_property(self):
+        """Verify the full public output schema including summary property and to_dict."""
+        self.recognizer.set_gesture(GestureType.POINT_FORWARD, direction=GestureDirection.FORWARD, confidence=0.93)
+        output = self.agent.process({"frame_id": 42})
+
+        self.assertEqual(output.gesture, "POINT_FORWARD")
+        self.assertEqual(output.direction, "FORWARD")
+        self.assertAlmostEqual(output.confidence, 0.93)
+        self.assertTrue(output.is_gesture_detected)
+        self.assertEqual(output.frame_id, 42)
+        self.assertIsInstance(output.recognized_gestures, list)
+        self.assertIn("POINT_FORWARD", output.summary)
+        self.assertEqual(output.summary, output.summary_text)
+
+        out_dict = output.to_dict()
+        for key in ["gesture", "direction", "confidence", "is_gesture_detected", "recognized_gestures", "frame_id", "summary"]:
+            self.assertIn(key, out_dict)
+
 
 class TestHagridGestureRecognizer(unittest.TestCase):
     """Deep unit tests for HagridGestureRecognizer."""
@@ -363,6 +381,118 @@ class TestLightweightGestureRecognizer(unittest.TestCase):
         results = self.recognizer.recognize(landmarks=landmarks)
         self.assertTrue(len(results) > 0)
         self.assertEqual(results[0].gesture, GestureType.STOP)
+
+    def test_landmark_pointing_directions(self):
+        # 1. POINT_LEFT: index finger extended to left (dx < -0.02)
+        wrist = [0.5, 0.9]
+        # index: mcp=(0.5, 0.7), pip=(0.45, 0.65), dip=(0.35, 0.65), tip=(0.20, 0.65)
+        # others curled (tip close to wrist)
+        lms_left = [wrist]
+        # thumb (curled)
+        for _ in range(4):
+            lms_left.append([0.5, 0.88])
+        # index (extended left)
+        lms_left.extend([[0.5, 0.7], [0.45, 0.65], [0.35, 0.65], [0.20, 0.65]])
+        # middle, ring, pinky (curled)
+        for _ in range(3 * 4):
+            lms_left.append([0.5, 0.88])
+
+        res_left = self.recognizer.recognize(landmarks=lms_left)
+        self.assertTrue(len(res_left) > 0)
+        self.assertEqual(res_left[0].gesture, GestureType.POINT_LEFT)
+        self.assertEqual(res_left[0].direction, GestureDirection.LEFT)
+
+        # 2. POINT_RIGHT: index finger extended to right (dx > 0.02)
+        lms_right = [wrist]
+        for _ in range(4):
+            lms_right.append([0.5, 0.88])
+        lms_right.extend([[0.5, 0.7], [0.55, 0.65], [0.65, 0.65], [0.80, 0.65]])
+        for _ in range(3 * 4):
+            lms_right.append([0.5, 0.88])
+
+        res_right = self.recognizer.recognize(landmarks=lms_right)
+        self.assertTrue(len(res_right) > 0)
+        self.assertEqual(res_right[0].gesture, GestureType.POINT_RIGHT)
+        self.assertEqual(res_right[0].direction, GestureDirection.RIGHT)
+
+        # 3. POINT_FORWARD: index finger extended straight up/forward
+        lms_fwd = [wrist]
+        for _ in range(4):
+            lms_fwd.append([0.5, 0.88])
+        lms_fwd.extend([[0.5, 0.7], [0.5, 0.55], [0.5, 0.40], [0.5, 0.25]])
+        for _ in range(3 * 4):
+            lms_fwd.append([0.5, 0.88])
+
+        res_fwd = self.recognizer.recognize(landmarks=lms_fwd)
+        self.assertTrue(len(res_fwd) > 0)
+        self.assertEqual(res_fwd[0].gesture, GestureType.POINT_FORWARD)
+        self.assertEqual(res_fwd[0].direction, GestureDirection.FORWARD)
+
+    def test_landmark_thumbs_up_down(self):
+        wrist = [0.5, 0.5]
+        # Thumbs up: thumb tip y < wrist y (above), other fingers curled
+        lms_up = [wrist]
+        # thumb extended up: tip at (0.5, 0.2)
+        lms_up.extend([[0.5, 0.4], [0.5, 0.35], [0.5, 0.3], [0.5, 0.2]])
+        # other 4 fingers curled (close to wrist)
+        for _ in range(4 * 4):
+            lms_up.append([0.5, 0.52])
+
+        res_up = self.recognizer.recognize(landmarks=lms_up)
+        self.assertTrue(len(res_up) > 0)
+        self.assertEqual(res_up[0].gesture, GestureType.THUMBS_UP)
+        self.assertEqual(res_up[0].direction, GestureDirection.UP)
+
+    def test_frame_inference_execution(self):
+        # Empty frame returns empty
+        empty = np.zeros((480, 640, 3), dtype=np.uint8)
+        self.assertEqual(self.recognizer.recognize(frame=empty), [])
+
+        # Non-empty frame processes through MediaPipe without crashing
+        sample_frame = np.ones((480, 640, 3), dtype=np.uint8) * 128
+        res = self.recognizer.recognize(frame=sample_frame)
+        self.assertIsInstance(res, list)
+
+    def test_landmark_ok_gesture(self):
+        wrist = [0.5, 0.9]
+        # Thumb and index tips touching at (0.45, 0.6)
+        # Thumb: (0.5, 0.8), (0.48, 0.7), (0.46, 0.65), (0.45, 0.6)
+        # Index: (0.5, 0.7), (0.48, 0.65), (0.46, 0.62), (0.45, 0.6)
+        # Middle, ring, pinky extended away from wrist:
+        lms_ok = [wrist]
+        lms_ok.extend([[0.5, 0.8], [0.48, 0.7], [0.46, 0.65], [0.45, 0.6]])  # thumb
+        lms_ok.extend([[0.5, 0.7], [0.48, 0.65], [0.46, 0.62], [0.45, 0.6]])  # index (touching thumb)
+        lms_ok.extend([[0.5, 0.7], [0.5, 0.5], [0.5, 0.35], [0.5, 0.2]])     # middle (extended)
+        lms_ok.extend([[0.6, 0.7], [0.6, 0.5], [0.6, 0.35], [0.6, 0.2]])     # ring (extended)
+        lms_ok.extend([[0.7, 0.7], [0.7, 0.5], [0.7, 0.35], [0.7, 0.2]])     # pinky (extended)
+
+        res_ok = self.recognizer.recognize(landmarks=lms_ok)
+        self.assertTrue(len(res_ok) > 0)
+        self.assertEqual(res_ok[0].gesture, GestureType.OK)
+        self.assertEqual(res_ok[0].direction, GestureDirection.NONE)
+
+    def test_landmark_rock_gesture(self):
+        wrist = [0.5, 0.9]
+        # Index and pinky extended, middle and ring curled
+        lms_rock = [wrist]
+        # thumb (curled)
+        for _ in range(4):
+            lms_rock.append([0.5, 0.88])
+        # index (extended)
+        lms_rock.extend([[0.4, 0.7], [0.4, 0.55], [0.4, 0.4], [0.4, 0.25]])
+        # middle (curled)
+        for _ in range(4):
+            lms_rock.append([0.5, 0.88])
+        # ring (curled)
+        for _ in range(4):
+            lms_rock.append([0.55, 0.88])
+        # pinky (extended)
+        lms_rock.extend([[0.7, 0.7], [0.7, 0.55], [0.7, 0.4], [0.7, 0.25]])
+
+        res_rock = self.recognizer.recognize(landmarks=lms_rock)
+        self.assertTrue(len(res_rock) > 0)
+        self.assertEqual(res_rock[0].gesture, GestureType.ROCK)
+        self.assertEqual(res_rock[0].direction, GestureDirection.NONE)
 
     def test_insufficient_landmarks(self):
         results = self.recognizer.recognize(landmarks=[[0.1, 0.2]])

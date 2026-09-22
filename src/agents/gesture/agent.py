@@ -74,7 +74,7 @@ class GestureAgent(BaseAgent):
         """Initialize the configured gesture recognizer backend."""
         if self.recognizer is None:
             gesture_cfg = self.config.get("gesture", {})
-            backend = gesture_cfg.get("backend", "hagrid").lower()
+            backend = gesture_cfg.get("backend", "lightweight").lower()
             conf_thresh = gesture_cfg.get("confidence_threshold", self._confidence_threshold)
 
             if backend == "mock":

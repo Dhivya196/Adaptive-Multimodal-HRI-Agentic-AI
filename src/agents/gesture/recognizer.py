@@ -89,12 +89,57 @@ class LightweightGestureRecognizer(BaseGestureRecognizer):
         GestureType.NO_GESTURE: GestureDirection.NONE,
     }
 
-    def __init__(self, confidence_threshold: float = 0.50):
+    def __init__(
+        self,
+        confidence_threshold: float = 0.50,
+        model_asset_path: Optional[str] = "models/mediapipe/hand_landmarker.task",
+    ):
         super().__init__(confidence_threshold=confidence_threshold)
+        self.model_asset_path = model_asset_path
+        self._landmarker = None
 
     def load_model(self) -> bool:
-        """Initialize lightweight geometric heuristics engine."""
+        """Initialize MediaPipe hand landmarker and geometric heuristics engine."""
         self.is_loaded = True
+        try:
+            import urllib.request
+            from pathlib import Path
+            import mediapipe as mp
+            from mediapipe.tasks.python import vision
+            from mediapipe.tasks.python.core import base_options
+
+            path = Path(self.model_asset_path) if self.model_asset_path else None
+            if path and not path.is_absolute():
+                project_root = Path(__file__).resolve().parent.parent.parent.parent
+                path = project_root / self.model_asset_path
+
+            if path:
+                if not path.exists():
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    self.logger.info(f"Downloading official MediaPipe hand landmarker task asset to '{path}'...")
+                    asset_url = (
+                        "https://storage.googleapis.com/mediapipe-models/hand_landmarker/"
+                        "hand_landmarker/float16/1/hand_landmarker.task"
+                    )
+                    urllib.request.urlretrieve(asset_url, str(path))
+                    self.logger.info("MediaPipe hand landmarker task asset downloaded successfully.")
+
+                options = vision.HandLandmarkerOptions(
+                    base_options=base_options.BaseOptions(model_asset_path=str(path)),
+                    running_mode=vision.RunningMode.IMAGE,
+                    num_hands=2,
+                    min_hand_detection_confidence=0.4,
+                    min_hand_presence_confidence=0.4,
+                )
+                self._landmarker = vision.HandLandmarker.create_from_options(options)
+                self.logger.info("MediaPipe HandLandmarker detector initialized successfully.")
+        except Exception as e:
+            self.logger.warning(
+                f"MediaPipe HandLandmarker could not be initialized ({e}). "
+                "LightweightGestureRecognizer will operate in landmark-only mode."
+            )
+            self._landmarker = None
+
         self.logger.info("LightweightGestureRecognizer initialized successfully.")
         return True
 
@@ -154,12 +199,22 @@ class LightweightGestureRecognizer(BaseGestureRecognizer):
         dx = index_tip[0] - index_pip[0]
         dy = index_tip[1] - index_pip[1]
 
-        # Calculate bounding box
+        # Calculate bounding box in landmark space
         xs = [p[0] for p in points]
         ys = [p[1] for p in points]
         bbox = HandBBox(x1=min(xs), y1=min(ys), x2=max(xs), y2=max(ys))
 
-        # Heuristic 1: STOP - All fingers extended, open palm
+        # Heuristic 1: OK Gesture - Thumb tip touching index tip with middle, ring, pinky extended
+        d_thumb_index = (thumb_tip[0] - index_tip[0]) ** 2 + (thumb_tip[1] - index_tip[1]) ** 2
+        if d_thumb_index < 0.005 and middle_extended and ring_extended and pinky_extended:
+            return RecognizedGesture(
+                gesture=GestureType.OK,
+                direction=GestureDirection.NONE,
+                confidence=0.89,
+                bbox=bbox,
+            )
+
+        # Heuristic 2: STOP - All fingers extended, open palm
         if extended_count >= 4:
             return RecognizedGesture(
                 gesture=GestureType.STOP,
@@ -169,7 +224,16 @@ class LightweightGestureRecognizer(BaseGestureRecognizer):
                 metadata={"extended_fingers": extended_count},
             )
 
-        # Heuristic 2: POINTING - Only index finger extended
+        # Heuristic 3: ROCK Gesture - Index and pinky extended, middle and ring curled
+        if index_extended and pinky_extended and not middle_extended and not ring_extended:
+            return RecognizedGesture(
+                gesture=GestureType.ROCK,
+                direction=GestureDirection.NONE,
+                confidence=0.88,
+                bbox=bbox,
+            )
+
+        # Heuristic 4: POINTING - Only index finger extended
         if index_extended and not middle_extended and not ring_extended and not pinky_extended:
             # Determine direction by horizontal and vertical displacement
             if abs(dx) > abs(dy) * 0.8:
@@ -191,7 +255,7 @@ class LightweightGestureRecognizer(BaseGestureRecognizer):
                 metadata={"dx": round(dx, 3), "dy": round(dy, 3)},
             )
 
-        # Heuristic 3: THUMBS_UP / THUMBS_DOWN - Fingers curled, thumb extended vertically
+        # Heuristic 5: THUMBS_UP / THUMBS_DOWN - Fingers curled, thumb extended vertically
         if extended_count == 0 and thumb_extended:
             d_thumb_y = thumb_tip[1] - wrist[1]
             if d_thumb_y < -0.05:
@@ -209,7 +273,7 @@ class LightweightGestureRecognizer(BaseGestureRecognizer):
                     bbox=bbox,
                 )
 
-        # Heuristic 4: WAVE - 3 or more fingers extended with significant horizontal wrist spread
+        # Heuristic 6: WAVE - 3 or more fingers extended with significant horizontal wrist spread
         if extended_count >= 3:
             return RecognizedGesture(
                 gesture=GestureType.WAVE,
@@ -231,49 +295,99 @@ class LightweightGestureRecognizer(BaseGestureRecognizer):
         frame: Optional[np.ndarray] = None,
         landmarks: Optional[List[Any]] = None,
     ) -> List[RecognizedGesture]:
-        """Perform gesture recognition."""
+        """
+        Perform gesture recognition.
+        
+        If landmarks are explicitly passed, evaluates landmark geometry directly.
+        If an image frame is passed, runs MediaPipe HandLandmarker to extract 21 keypoints
+        per detected hand and classifies each hand's gesture.
+        """
         if not self.is_loaded:
             self.load_model()
 
-        # If explicit landmarks are provided (e.g. from dataset or MediaPipe upstream)
+        # 1. Explicit landmarks provided
         if landmarks is not None and len(landmarks) > 0:
             rec = self._classify_from_landmarks(landmarks)
             if rec.confidence >= self.confidence_threshold:
                 return [rec]
             return []
 
-        # If a raw image frame is provided
+        # 2. Raw image frame provided
         if frame is not None:
             if not isinstance(frame, np.ndarray):
                 raise PerceptionError("Frame must be a valid NumPy array.")
             if frame.size == 0:
                 raise PerceptionError("Cannot process an empty image frame.")
 
-            # Lightweight skin / motion / contour heuristic on image
-            h, w = frame.shape[:2]
-            # If the image is completely blank / solid black (e.g. synthetic empty test frame)
+            # If the image is completely blank / solid black, return no detections
             if np.max(frame) == 0:
                 return []
 
-            # Simple center bounding box estimation
-            bbox = HandBBox(
-                x1=w * 0.35,
-                y1=h * 0.30,
-                x2=w * 0.65,
-                y2=h * 0.70,
-            )
+            h, w = frame.shape[:2]
 
-            # In standalone image mode without landmarks or heavy ML weights,
-            # we detect presence of visual hand content and return a neutral forward point or stop
-            return [
-                RecognizedGesture(
-                    gesture=GestureType.POINT_FORWARD,
-                    direction=GestureDirection.FORWARD,
-                    confidence=0.75,
-                    bbox=bbox,
-                    metadata={"source": "frame_heuristic"},
-                )
-            ]
+            # If MediaPipe HandLandmarker is available, process the real image frame
+            if self._landmarker is not None:
+                try:
+                    import cv2
+                    import mediapipe as mp
+
+                    # Ensure RGB format for MediaPipe Image
+                    if len(frame.shape) == 2:
+                        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2RGB)
+                    elif frame.shape[2] == 4:
+                        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2RGB)
+                    elif frame.shape[2] == 3:
+                        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    else:
+                        rgb_frame = frame
+
+                    mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
+                    detection_result = self._landmarker.detect(mp_image)
+
+                    recognized: List[RecognizedGesture] = []
+                    if detection_result and detection_result.hand_landmarks:
+                        for idx, hand_lms in enumerate(detection_result.hand_landmarks):
+                            rec = self._classify_from_landmarks(hand_lms)
+                            
+                            # Convert normalized landmark bounding box to pixel coordinates
+                            xs = [pt.x * w if hasattr(pt, "x") else float(pt[0]) * w for pt in hand_lms]
+                            ys = [pt.y * h if hasattr(pt, "y") else float(pt[1]) * h for pt in hand_lms]
+                            rec.bbox = HandBBox(
+                                x1=max(0.0, min(xs)),
+                                y1=max(0.0, min(ys)),
+                                x2=min(float(w), max(xs)),
+                                y2=min(float(h), max(ys)),
+                            )
+                            rec.metadata["source"] = "mediapipe_hand_landmarker"
+
+                            # Handedness extraction if available
+                            if (
+                                getattr(detection_result, "handedness", None)
+                                and idx < len(detection_result.handedness)
+                                and detection_result.handedness[idx]
+                            ):
+                                side_name = detection_result.handedness[idx][0].category_name.lower()
+                                rec.hand_side = (
+                                    HandSide.LEFT
+                                    if "left" in side_name
+                                    else (HandSide.RIGHT if "right" in side_name else HandSide.ANY)
+                                )
+                                rec.metadata["handedness_score"] = round(
+                                    float(detection_result.handedness[idx][0].score), 3
+                                )
+
+                            if rec.confidence >= self.confidence_threshold:
+                                recognized.append(rec)
+
+                        # Sort recognized gestures by confidence descending
+                        recognized.sort(key=lambda g: g.confidence, reverse=True)
+                        return recognized
+
+                except Exception as e:
+                    self.logger.debug(f"MediaPipe detection failed on frame: {e}")
+
+            # If MediaPipe didn't detect any hands or is not available
+            return []
 
         # Neither frame nor landmarks provided
         return []

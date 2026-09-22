@@ -120,7 +120,7 @@ def main():
     config = load_config(args.config) if (args.config and Path(args.config).exists()) else {}
 
     gesture_cfg = config.get("gesture", {})
-    backend = args.backend or gesture_cfg.get("backend", "hagrid")
+    backend = args.backend or gesture_cfg.get("backend", "lightweight")
     model_path = args.model_path or gesture_cfg.get("model_path", "models/hagrid/yolov10n_hagrid.pt")
     conf_thresh = args.conf or gesture_cfg.get("confidence_threshold", 0.50)
     device = args.device or gesture_cfg.get("device", "cpu")

@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, TypedDict
 
+from src.agents.gesture.schemas import GestureAgentOutput
 from src.agents.vision.schemas import DetectedObject, ProximityLevel, SpatialSector, VisionAgentOutput
 from src.agents.voice.schemas import SpeechIntent, UrgencyLevel, VoiceAgentOutput
 from src.common.schemas import BaseAgentInput, BaseAgentOutput
@@ -20,24 +21,6 @@ class TaskStatus(str, Enum):
 
 
 @dataclass
-class GestureAgentOutput:
-    """Future perception output contract for the Gesture Agent."""
-    gesture_type: str = "none"
-    pointing_direction: Optional[str] = None
-    confidence: float = 0.0
-    detected_landmarks: List[Any] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "gesture_type": self.gesture_type,
-            "pointing_direction": self.pointing_direction,
-            "confidence": round(self.confidence, 3),
-            "metadata": self.metadata,
-        }
-
-
-@dataclass
 class MultimodalTask:
     """Structured high-level task interpreted from multimodal perception inputs."""
     action: str = "none"
@@ -51,6 +34,7 @@ class MultimodalTask:
     matched_visual_object: Optional[DetectedObject] = None
     reasoning: str = ""
     modality_contributions: Dict[str, float] = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -69,6 +53,7 @@ class MultimodalTask:
             "matched_visual_object": self.matched_visual_object.to_dict() if self.matched_visual_object else None,
             "reasoning": self.reasoning,
             "modality_contributions": self.modality_contributions,
+            "metadata": self.metadata,
         }
 
 

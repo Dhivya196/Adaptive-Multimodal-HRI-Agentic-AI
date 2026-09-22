@@ -122,6 +122,11 @@ class GestureAgentOutput(BaseAgentOutput):
     frame_id: int = 0
     summary_text: str = ""
 
+    @property
+    def summary(self) -> str:
+        """Alias for summary_text to maintain full schema compliance."""
+        return self.summary_text
+
     def to_dict(self) -> Dict[str, Any]:
         base_dict = super().to_dict()
         base_dict.update({
@@ -132,5 +137,6 @@ class GestureAgentOutput(BaseAgentOutput):
             "recognized_gestures": [g.to_dict() for g in self.recognized_gestures],
             "frame_id": self.frame_id,
             "summary_text": self.summary_text,
+            "summary": self.summary_text,
         })
         return base_dict

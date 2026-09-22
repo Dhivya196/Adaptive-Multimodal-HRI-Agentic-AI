@@ -41,13 +41,24 @@ class CameraManager:
             self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
             self.cap.set(cv2.CAP_PROP_FPS, self.fps)
 
+            # Validate that device can actually produce frames (handles busy / dummy devices)
+            ret, test_frame = self.cap.read()
+            if not ret or test_frame is None:
+                self.logger.warning(f"Camera opened but failed to capture test frame at source '{self.source}'.")
+                self.cap.release()
+                self.cap = None
+                return False
+
             actual_w = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
             actual_h = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
             self.logger.info(f"Camera opened successfully ({actual_w}x{actual_h} @ {self.fps}fps).")
             return True
         except Exception as e:
-            self.logger.error(f"Error opening camera source '{self.source}': {e}")
-            raise CameraStreamError(f"Failed to open camera: {e}") from e
+            self.logger.warning(f"Error opening camera source '{self.source}': {e}")
+            if self.cap:
+                self.cap.release()
+                self.cap = None
+            return False
 
     def enable_synthetic_mode(self) -> None:
         """Enable synthetic test frame generation (for test environments without webcam)."""

@@ -1,0 +1,22 @@
+ID,Description,Expected Status,Actual Status,Expected Safety,Actual Safety,Passed,Latency
+T01,Voice + Vision + Gesture: Correct pointing to an object,VALID,VALID,SAFE,SAFE,True,9.606599807739258
+T02,Voice + Vision + Gesture: Modality conflict (points away from object),MODALITY_CONFLICT,MODALITY_CONFLICT,,SAFE,True,3.059864044189453
+T03,Voice + Vision: Object requested is not in scene,TARGET_NOT_FOUND,TARGET_NOT_FOUND,,UNSAFE,True,3.0128955841064453
+T04,Voice + Vision + Gesture: Object absent from pointed sector,VALID,VALID,,SAFE,True,5.323886871337891
+T05,Voice + Vision + Gesture: Multiple objects in pointed sector (Ambiguous),VALID,VALID,,SAFE,True,8.020162582397461
+T06,Voice Only: Emergency Stop,VALID,VALID,STOP,STOP,True,6.410121917724609
+T07,Unsafe obstacle distance,VALID,VALID,STOP,STOP,True,4.552364349365234
+T08,Voice + Vision: Explicit target agreement,VALID,VALID,SAFE,SAFE,True,5.126476287841797
+T09,Voice only: General action without object,VALID,VALID,SAFE,SAFE,True,7.012128829956055
+T10,Low confidence voice input,LOW_CONFIDENCE,LOW_CONFIDENCE,,SAFE,True,48.070669174194336
+T11,Invalid Input (No relevant data),INVALID_INPUT,INVALID_INPUT,,UNSAFE,True,3.0145645141601562
+T12,Multi-turn context: First command,VALID,VALID,SAFE,SAFE,True,2.9845237731933594
+T13,Multi-turn context: Pronoun resolution (follows T12),VALID,VALID,SAFE,SAFE,True,3.6842823028564453
+T14,Voice + Vision: Ambiguous explicit target (two bottles),VALID,VALID,SAFE,SAFE,True,3.360271453857422
+T15,Voice + Gesture: Modality Conflict,MODALITY_CONFLICT,MODALITY_CONFLICT,,SAFE,True,6.519556045532227
+T16,Human intervention required (medium risk),VALID,VALID,SAFE,SAFE,True,3.7763118743896484
+T17,Vision + Gesture without Voice,VALID,VALID,,SAFE,True,5.147457122802734
+T18,Voice + Vision + Gesture: Perfect agreement,VALID,VALID,SAFE,SAFE,True,4.083395004272461
+T19,Unsafe distance (Human too close),VALID,VALID,SAFE,SAFE,True,3.135204315185547
+T20,Sensor validity failed,VALID,VALID,SAFE,SAFE,True,5.661725997924805
+T21,Stop command overrides everything,VALID,VALID,SAFE,SAFE,True,4.494905471801758

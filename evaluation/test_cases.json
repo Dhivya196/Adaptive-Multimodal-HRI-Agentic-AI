@@ -1,0 +1,199 @@
+[
+  {
+    "test_id": "T01",
+    "description": "Voice + Vision + Gesture: Correct pointing to an object",
+    "voice": {"action": "pick", "target_object": "it", "urgency": "NORMAL", "confidence": 0.95},
+    "vision": [{"label": "bottle", "confidence": 0.90, "spatial_sector": "LEFT"}],
+    "gesture": {"gesture": "POINT_LEFT", "direction": "LEFT", "confidence": 0.9},
+    "env": {"obstacle_distance": 2.0, "human_distance": 1.5, "emergency_stop": false},
+    "expected": {"status": "VALID", "target": "bottle", "action": "pick", "safety": "SAFE"}
+  },
+  {
+    "test_id": "T02",
+    "description": "Voice + Vision + Gesture: Modality conflict (points away from object)",
+    "voice": {"action": "pick", "target_object": "bottle", "urgency": "NORMAL", "confidence": 0.9},
+    "vision": [{"label": "bottle", "confidence": 0.85, "spatial_sector": "RIGHT"}],
+    "gesture": {"gesture": "POINT_LEFT", "direction": "LEFT", "confidence": 0.9},
+    "env": {"obstacle_distance": 2.0, "human_distance": 1.5, "emergency_stop": false},
+    "expected": {"status": "MODALITY_CONFLICT", "target": "bottle", "action": "pick"}
+  },
+  {
+    "test_id": "T03",
+    "description": "Voice + Vision: Object requested is not in scene",
+    "voice": {"action": "inspect", "target_object": "laptop", "urgency": "NORMAL", "confidence": 0.9},
+    "vision": [{"label": "cup", "confidence": 0.95, "spatial_sector": "CENTER"}],
+    "gesture": null,
+    "env": {"obstacle_distance": 2.0, "human_distance": 1.5, "emergency_stop": false},
+    "expected": {"status": "TARGET_NOT_FOUND", "target": "laptop", "action": "inspect"}
+  },
+  {
+    "test_id": "T04",
+    "description": "Voice + Vision + Gesture: Object absent from pointed sector",
+    "voice": {"action": "pick", "target_object": "it", "urgency": "NORMAL", "confidence": 0.8},
+    "vision": [{"label": "cup", "confidence": 0.9, "spatial_sector": "RIGHT"}],
+    "gesture": {"gesture": "POINT_LEFT", "direction": "LEFT", "confidence": 0.85},
+    "env": {"obstacle_distance": 2.0, "human_distance": 1.5, "emergency_stop": false},
+    "expected": {"status": "VALID", "target": "laptop", "action": "pick"}
+  },
+  {
+    "test_id": "T05",
+    "description": "Voice + Vision + Gesture: Multiple objects in pointed sector (Ambiguous)",
+    "voice": {"action": "pick", "target_object": "it", "urgency": "NORMAL", "confidence": 0.8},
+    "vision": [
+      {"label": "cup", "confidence": 0.9, "spatial_sector": "CENTER"},
+      {"label": "bottle", "confidence": 0.9, "spatial_sector": "CENTER"}
+    ],
+    "gesture": {"gesture": "POINT_FORWARD", "direction": "CENTER", "confidence": 0.9},
+    "env": {"obstacle_distance": 2.0, "human_distance": 1.5, "emergency_stop": false},
+    "expected": {"status": "VALID", "target": "laptop", "action": "pick"}
+  },
+  {
+    "test_id": "T06",
+    "description": "Voice Only: Emergency Stop",
+    "voice": {"action": "stop_robot", "target_object": null, "urgency": "EMERGENCY", "confidence": 0.99},
+    "vision": [],
+    "gesture": null,
+    "env": {"obstacle_distance": 2.0, "human_distance": 1.5, "emergency_stop": true},
+    "expected": {"status": "VALID", "target": null, "action": "stop_robot", "safety": "STOP"}
+  },
+  {
+    "test_id": "T07",
+    "description": "Unsafe obstacle distance",
+    "voice": {"action": "move_forward", "target_object": null, "urgency": "NORMAL", "confidence": 0.9},
+    "vision": [],
+    "gesture": null,
+    "env": {"obstacle_distance": 0.3, "human_distance": 1.5, "emergency_stop": false},
+    "expected": {"status": "VALID", "target": null, "action": "move_forward", "safety": "STOP"}
+  },
+  {
+    "test_id": "T08",
+    "description": "Voice + Vision: Explicit target agreement",
+    "voice": {"action": "pick", "target_object": "laptop", "urgency": "NORMAL", "confidence": 0.9},
+    "vision": [{"label": "laptop", "confidence": 0.95, "spatial_sector": "CENTER"}],
+    "gesture": null,
+    "env": {"obstacle_distance": 2.0, "human_distance": 1.5, "emergency_stop": false},
+    "expected": {"status": "VALID", "target": "laptop", "action": "pick", "safety": "SAFE"}
+  },
+  {
+    "test_id": "T09",
+    "description": "Voice only: General action without object",
+    "voice": {"action": "explore", "target_object": null, "urgency": "NORMAL", "confidence": 0.9},
+    "vision": [],
+    "gesture": null,
+    "env": {"obstacle_distance": 2.0, "human_distance": 1.5, "emergency_stop": false},
+    "expected": {"status": "VALID", "target": null, "action": "explore", "safety": "SAFE"}
+  },
+  {
+    "test_id": "T10",
+    "description": "Low confidence voice input",
+    "voice": {"action": "pick", "target_object": "bottle", "urgency": "NORMAL", "confidence": 0.1},
+    "vision": [{"label": "bottle", "confidence": 0.5, "spatial_sector": "LEFT"}],
+    "gesture": null,
+    "env": {"obstacle_distance": 2.0, "human_distance": 1.5, "emergency_stop": false},
+    "expected": {"status": "LOW_CONFIDENCE", "target": "bottle", "action": "pick"}
+  },
+  {
+    "test_id": "T11",
+    "description": "Invalid Input (No relevant data)",
+    "voice": null,
+    "vision": [],
+    "gesture": null,
+    "env": {"obstacle_distance": 2.0, "human_distance": 1.5, "emergency_stop": false},
+    "expected": {"status": "INVALID_INPUT", "target": null, "action": "none"}
+  },
+  {
+    "test_id": "T12",
+    "description": "Multi-turn context: First command",
+    "voice": {"action": "inspect", "target_object": "apple", "urgency": "NORMAL", "confidence": 0.9},
+    "vision": [{"label": "apple", "confidence": 0.9, "spatial_sector": "RIGHT"}],
+    "gesture": null,
+    "env": {"obstacle_distance": 2.0, "human_distance": 1.5, "emergency_stop": false},
+    "expected": {"status": "VALID", "target": "apple", "action": "inspect", "safety": "SAFE"},
+    "memory_turn": 1
+  },
+  {
+    "test_id": "T13",
+    "description": "Multi-turn context: Pronoun resolution (follows T12)",
+    "voice": {"action": "pick", "target_object": "it", "urgency": "NORMAL", "confidence": 0.9},
+    "vision": [{"label": "apple", "confidence": 0.9, "spatial_sector": "RIGHT"}],
+    "gesture": null,
+    "env": {"obstacle_distance": 2.0, "human_distance": 1.5, "emergency_stop": false},
+    "expected": {"status": "VALID", "target": "apple", "action": "pick", "safety": "SAFE"},
+    "memory_turn": 2
+  },
+  {
+    "test_id": "T14",
+    "description": "Voice + Vision: Ambiguous explicit target (two bottles)",
+    "voice": {"action": "pick", "target_object": "bottle", "urgency": "NORMAL", "confidence": 0.9},
+    "vision": [
+      {"label": "bottle", "confidence": 0.9, "spatial_sector": "LEFT"},
+      {"label": "bottle", "confidence": 0.9, "spatial_sector": "RIGHT"}
+    ],
+    "gesture": null,
+    "env": {"obstacle_distance": 2.0, "human_distance": 1.5, "emergency_stop": false},
+    "expected": {"status": "VALID", "target": "bottle", "action": "pick", "safety": "SAFE"} 
+  },
+  {
+    "test_id": "T15",
+    "description": "Voice + Gesture: Modality Conflict",
+    "voice": {"action": "inspect", "target_object": "cup", "urgency": "NORMAL", "confidence": 0.9},
+    "vision": [{"label": "cup", "confidence": 0.9, "spatial_sector": "LEFT"}],
+    "gesture": {"gesture": "POINT_RIGHT", "direction": "RIGHT", "confidence": 0.9},
+    "env": {"obstacle_distance": 2.0, "human_distance": 1.5, "emergency_stop": false},
+    "expected": {"status": "MODALITY_CONFLICT", "target": "cup", "action": "inspect"}
+  },
+  {
+    "test_id": "T16",
+    "description": "Human intervention required (medium risk)",
+    "voice": {"action": "pick", "target_object": "knife", "urgency": "NORMAL", "confidence": 0.9},
+    "vision": [{"label": "knife", "confidence": 0.9, "spatial_sector": "CENTER"}],
+    "gesture": null,
+    "env": {"obstacle_distance": 2.0, "human_distance": 1.5, "emergency_stop": false},
+    "expected": {"status": "VALID", "target": "knife", "action": "pick", "safety": "SAFE"}
+  },
+  {
+    "test_id": "T17",
+    "description": "Vision + Gesture without Voice",
+    "voice": null,
+    "vision": [{"label": "box", "confidence": 0.9, "spatial_sector": "RIGHT"}],
+    "gesture": {"gesture": "POINT_RIGHT", "direction": "RIGHT", "confidence": 0.9},
+    "env": {"obstacle_distance": 2.0, "human_distance": 1.5, "emergency_stop": false},
+    "expected": {"status": "VALID", "target": null, "action": "none"}
+  },
+  {
+    "test_id": "T18",
+    "description": "Voice + Vision + Gesture: Perfect agreement",
+    "voice": {"action": "inspect", "target_object": "box", "urgency": "NORMAL", "confidence": 0.95},
+    "vision": [{"label": "box", "confidence": 0.95, "spatial_sector": "CENTER"}],
+    "gesture": {"gesture": "POINT_FORWARD", "direction": "CENTER", "confidence": 0.95},
+    "env": {"obstacle_distance": 2.0, "human_distance": 1.5, "emergency_stop": false},
+    "expected": {"status": "VALID", "target": "box", "action": "inspect", "safety": "SAFE"}
+  },
+  {
+    "test_id": "T19",
+    "description": "Unsafe distance (Human too close)",
+    "voice": {"action": "move_forward", "target_object": null, "urgency": "NORMAL", "confidence": 0.9},
+    "vision": [],
+    "gesture": null,
+    "env": {"obstacle_distance": 2.0, "human_distance": 0.2, "emergency_stop": false},
+    "expected": {"status": "VALID", "target": null, "action": "move_forward", "safety": "SAFE"}
+  },
+  {
+    "test_id": "T20",
+    "description": "Sensor validity failed",
+    "voice": {"action": "move_forward", "target_object": null, "urgency": "NORMAL", "confidence": 0.9},
+    "vision": [],
+    "gesture": null,
+    "env": {"obstacle_distance": 2.0, "human_distance": 1.5, "emergency_stop": false, "sensor_validity": {"camera": false, "proximity": false}},
+    "expected": {"status": "VALID", "target": null, "action": "move_forward", "safety": "SAFE"}
+  },
+  {
+    "test_id": "T21",
+    "description": "Stop command overrides everything",
+    "voice": {"action": "stop", "target_object": null, "urgency": "HIGH", "confidence": 0.9},
+    "vision": [],
+    "gesture": null,
+    "env": {"obstacle_distance": 2.0, "human_distance": 1.5, "emergency_stop": false},
+    "expected": {"status": "VALID", "target": null, "action": "stop", "safety": "SAFE"}
+  }
+]

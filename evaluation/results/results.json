@@ -6,10 +6,17 @@
         "actual_status": "VALID",
         "expected_target": "bottle",
         "actual_target": "bottle",
+        "expected_action": "pick",
+        "actual_action": "pick",
         "expected_safety": "SAFE",
         "actual_safety": "SAFE",
+        "voice_intent_correct": true,
+        "target_extraction_correct": true,
+        "gesture_correct": true,
+        "context_resolution_correct": true,
+        "safety_correct": true,
         "passed": true,
-        "latency": 9.606599807739258
+        "latency": 10.151386260986328
     },
     {
         "id": "T02",
@@ -18,10 +25,17 @@
         "actual_status": "MODALITY_CONFLICT",
         "expected_target": "bottle",
         "actual_target": "bottle",
+        "expected_action": "pick",
+        "actual_action": "pick",
         "expected_safety": null,
         "actual_safety": "SAFE",
+        "voice_intent_correct": true,
+        "target_extraction_correct": true,
+        "gesture_correct": true,
+        "context_resolution_correct": true,
+        "safety_correct": true,
         "passed": true,
-        "latency": 3.059864044189453
+        "latency": 5.550146102905273
     },
     {
         "id": "T03",
@@ -30,10 +44,17 @@
         "actual_status": "TARGET_NOT_FOUND",
         "expected_target": "laptop",
         "actual_target": "laptop",
+        "expected_action": "inspect",
+        "actual_action": "inspect",
         "expected_safety": null,
         "actual_safety": "UNSAFE",
+        "voice_intent_correct": true,
+        "target_extraction_correct": true,
+        "gesture_correct": true,
+        "context_resolution_correct": true,
+        "safety_correct": true,
         "passed": true,
-        "latency": 3.0128955841064453
+        "latency": 4.568338394165039
     },
     {
         "id": "T04",
@@ -42,10 +63,17 @@
         "actual_status": "VALID",
         "expected_target": "laptop",
         "actual_target": "laptop",
+        "expected_action": "pick",
+        "actual_action": "pick",
         "expected_safety": null,
         "actual_safety": "SAFE",
+        "voice_intent_correct": true,
+        "target_extraction_correct": true,
+        "gesture_correct": true,
+        "context_resolution_correct": true,
+        "safety_correct": true,
         "passed": true,
-        "latency": 5.323886871337891
+        "latency": 6.0100555419921875
     },
     {
         "id": "T05",
@@ -54,10 +82,17 @@
         "actual_status": "VALID",
         "expected_target": "laptop",
         "actual_target": "laptop",
+        "expected_action": "pick",
+        "actual_action": "pick",
         "expected_safety": null,
         "actual_safety": "SAFE",
+        "voice_intent_correct": true,
+        "target_extraction_correct": true,
+        "gesture_correct": true,
+        "context_resolution_correct": true,
+        "safety_correct": true,
         "passed": true,
-        "latency": 8.020162582397461
+        "latency": 7.305145263671875
     },
     {
         "id": "T06",
@@ -66,10 +101,17 @@
         "actual_status": "VALID",
         "expected_target": null,
         "actual_target": null,
+        "expected_action": "stop_robot",
+        "actual_action": "stop_robot",
         "expected_safety": "STOP",
         "actual_safety": "STOP",
+        "voice_intent_correct": true,
+        "target_extraction_correct": true,
+        "gesture_correct": true,
+        "context_resolution_correct": true,
+        "safety_correct": true,
         "passed": true,
-        "latency": 6.410121917724609
+        "latency": 4.835367202758789
     },
     {
         "id": "T07",
@@ -78,10 +120,17 @@
         "actual_status": "VALID",
         "expected_target": null,
         "actual_target": null,
+        "expected_action": "move_forward",
+        "actual_action": "move_forward",
         "expected_safety": "STOP",
         "actual_safety": "STOP",
+        "voice_intent_correct": true,
+        "target_extraction_correct": true,
+        "gesture_correct": true,
+        "context_resolution_correct": true,
+        "safety_correct": true,
         "passed": true,
-        "latency": 4.552364349365234
+        "latency": 5.815982818603516
     },
     {
         "id": "T08",
@@ -90,10 +139,17 @@
         "actual_status": "VALID",
         "expected_target": "laptop",
         "actual_target": "laptop",
+        "expected_action": "pick",
+        "actual_action": "pick",
         "expected_safety": "SAFE",
         "actual_safety": "SAFE",
+        "voice_intent_correct": true,
+        "target_extraction_correct": true,
+        "gesture_correct": true,
+        "context_resolution_correct": true,
+        "safety_correct": true,
         "passed": true,
-        "latency": 5.126476287841797
+        "latency": 6.719112396240234
     },
     {
         "id": "T09",
@@ -102,10 +158,17 @@
         "actual_status": "VALID",
         "expected_target": null,
         "actual_target": null,
+        "expected_action": "explore",
+        "actual_action": "explore",
         "expected_safety": "SAFE",
         "actual_safety": "SAFE",
+        "voice_intent_correct": true,
+        "target_extraction_correct": true,
+        "gesture_correct": true,
+        "context_resolution_correct": true,
+        "safety_correct": true,
         "passed": true,
-        "latency": 7.012128829956055
+        "latency": 6.746053695678711
     },
     {
         "id": "T10",
@@ -114,10 +177,17 @@
         "actual_status": "LOW_CONFIDENCE",
         "expected_target": "bottle",
         "actual_target": "bottle",
+        "expected_action": "pick",
+        "actual_action": "pick",
         "expected_safety": null,
         "actual_safety": "SAFE",
+        "voice_intent_correct": true,
+        "target_extraction_correct": true,
+        "gesture_correct": true,
+        "context_resolution_correct": true,
+        "safety_correct": true,
         "passed": true,
-        "latency": 48.070669174194336
+        "latency": 6.705284118652344
     },
     {
         "id": "T11",
@@ -126,10 +196,17 @@
         "actual_status": "INVALID_INPUT",
         "expected_target": null,
         "actual_target": null,
+        "expected_action": "none",
+        "actual_action": "none",
         "expected_safety": null,
         "actual_safety": "UNSAFE",
+        "voice_intent_correct": true,
+        "target_extraction_correct": true,
+        "gesture_correct": true,
+        "context_resolution_correct": true,
+        "safety_correct": true,
         "passed": true,
-        "latency": 3.0145645141601562
+        "latency": 5.302190780639648
     },
     {
         "id": "T12",
@@ -138,10 +215,17 @@
         "actual_status": "VALID",
         "expected_target": "apple",
         "actual_target": "apple",
+        "expected_action": "inspect",
+        "actual_action": "inspect",
         "expected_safety": "SAFE",
         "actual_safety": "SAFE",
+        "voice_intent_correct": true,
+        "target_extraction_correct": true,
+        "gesture_correct": true,
+        "context_resolution_correct": true,
+        "safety_correct": true,
         "passed": true,
-        "latency": 2.9845237731933594
+        "latency": 6.294012069702148
     },
     {
         "id": "T13",
@@ -150,10 +234,17 @@
         "actual_status": "VALID",
         "expected_target": "apple",
         "actual_target": "apple",
+        "expected_action": "pick",
+        "actual_action": "pick",
         "expected_safety": "SAFE",
         "actual_safety": "SAFE",
+        "voice_intent_correct": true,
+        "target_extraction_correct": true,
+        "gesture_correct": true,
+        "context_resolution_correct": true,
+        "safety_correct": true,
         "passed": true,
-        "latency": 3.6842823028564453
+        "latency": 6.685733795166016
     },
     {
         "id": "T14",
@@ -162,10 +253,17 @@
         "actual_status": "VALID",
         "expected_target": "bottle",
         "actual_target": "bottle",
+        "expected_action": "pick",
+        "actual_action": "pick",
         "expected_safety": "SAFE",
         "actual_safety": "SAFE",
+        "voice_intent_correct": true,
+        "target_extraction_correct": true,
+        "gesture_correct": true,
+        "context_resolution_correct": true,
+        "safety_correct": true,
         "passed": true,
-        "latency": 3.360271453857422
+        "latency": 6.589412689208984
     },
     {
         "id": "T15",
@@ -174,10 +272,17 @@
         "actual_status": "MODALITY_CONFLICT",
         "expected_target": "cup",
         "actual_target": "cup",
+        "expected_action": "inspect",
+        "actual_action": "inspect",
         "expected_safety": null,
         "actual_safety": "SAFE",
+        "voice_intent_correct": true,
+        "target_extraction_correct": true,
+        "gesture_correct": true,
+        "context_resolution_correct": true,
+        "safety_correct": true,
         "passed": true,
-        "latency": 6.519556045532227
+        "latency": 7.484912872314453
     },
     {
         "id": "T16",
@@ -186,10 +291,17 @@
         "actual_status": "VALID",
         "expected_target": "knife",
         "actual_target": "knife",
+        "expected_action": "pick",
+        "actual_action": "pick",
         "expected_safety": "SAFE",
         "actual_safety": "SAFE",
+        "voice_intent_correct": true,
+        "target_extraction_correct": true,
+        "gesture_correct": true,
+        "context_resolution_correct": true,
+        "safety_correct": true,
         "passed": true,
-        "latency": 3.7763118743896484
+        "latency": 6.746530532836914
     },
     {
         "id": "T17",
@@ -198,10 +310,17 @@
         "actual_status": "VALID",
         "expected_target": null,
         "actual_target": null,
+        "expected_action": "none",
+        "actual_action": "none",
         "expected_safety": null,
         "actual_safety": "SAFE",
+        "voice_intent_correct": true,
+        "target_extraction_correct": true,
+        "gesture_correct": true,
+        "context_resolution_correct": true,
+        "safety_correct": true,
         "passed": true,
-        "latency": 5.147457122802734
+        "latency": 8.671045303344727
     },
     {
         "id": "T18",
@@ -210,10 +329,17 @@
         "actual_status": "VALID",
         "expected_target": "box",
         "actual_target": "box",
+        "expected_action": "inspect",
+        "actual_action": "inspect",
         "expected_safety": "SAFE",
         "actual_safety": "SAFE",
+        "voice_intent_correct": true,
+        "target_extraction_correct": true,
+        "gesture_correct": true,
+        "context_resolution_correct": true,
+        "safety_correct": true,
         "passed": true,
-        "latency": 4.083395004272461
+        "latency": 7.45081901550293
     },
     {
         "id": "T19",
@@ -222,10 +348,17 @@
         "actual_status": "VALID",
         "expected_target": null,
         "actual_target": null,
+        "expected_action": "move_forward",
+        "actual_action": "move_forward",
         "expected_safety": "SAFE",
         "actual_safety": "SAFE",
+        "voice_intent_correct": true,
+        "target_extraction_correct": true,
+        "gesture_correct": true,
+        "context_resolution_correct": true,
+        "safety_correct": true,
         "passed": true,
-        "latency": 3.135204315185547
+        "latency": 6.928205490112305
     },
     {
         "id": "T20",
@@ -234,10 +367,17 @@
         "actual_status": "VALID",
         "expected_target": null,
         "actual_target": null,
+        "expected_action": "move_forward",
+        "actual_action": "move_forward",
         "expected_safety": "SAFE",
         "actual_safety": "SAFE",
+        "voice_intent_correct": true,
+        "target_extraction_correct": true,
+        "gesture_correct": true,
+        "context_resolution_correct": true,
+        "safety_correct": true,
         "passed": true,
-        "latency": 5.661725997924805
+        "latency": 5.717277526855469
     },
     {
         "id": "T21",
@@ -246,9 +386,16 @@
         "actual_status": "VALID",
         "expected_target": null,
         "actual_target": null,
+        "expected_action": "stop",
+        "actual_action": "stop",
         "expected_safety": "SAFE",
         "actual_safety": "SAFE",
+        "voice_intent_correct": true,
+        "target_extraction_correct": true,
+        "gesture_correct": true,
+        "context_resolution_correct": true,
+        "safety_correct": true,
         "passed": true,
-        "latency": 4.494905471801758
+        "latency": 4.929065704345703
     }
 ]

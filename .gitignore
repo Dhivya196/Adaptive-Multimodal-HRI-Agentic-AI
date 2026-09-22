@@ -73,6 +73,7 @@ yolo26*.pt
 
 # Data and recordings
 data/
+!data/README.md
 recordings/
 output/
 *.mp4

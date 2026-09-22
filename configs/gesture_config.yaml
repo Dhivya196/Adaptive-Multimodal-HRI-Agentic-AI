@@ -1,8 +1,10 @@
 # Gesture Agent Configuration for Adaptive Multimodal HRI
 gesture:
-  backend: "lightweight"            # "lightweight" or "mock"
-  confidence_threshold: 0.50        # Minimum confidence threshold for gesture detection
-  default_direction: "NONE"         # Fallback direction when not spatially grounded
+  backend: "hagrid"                    # "hagrid" (primary), "lightweight" (fallback), or "mock"
+  model_path: "models/hagrid/yolov10n_hagrid.pt"  # Path to pretrained HaGRID detector
+  confidence_threshold: 0.50           # Minimum confidence threshold for gesture detection
+  device: "cpu"                        # Compute device ("cpu" for standard machine)
+  default_direction: "NONE"            # Fallback direction when not spatially grounded
   enabled_gestures:
     - "STOP"
     - "POINT_LEFT"

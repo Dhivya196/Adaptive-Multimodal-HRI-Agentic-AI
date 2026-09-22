@@ -4,7 +4,7 @@
 
 controller:
   # Execution mode: "mock" for simulation without ROS, "ros2" for actual hardware
-  mode: "mock"
+  mode: "ros2"
   
   # Movement parameters
   linear_speed: 0.2  # m/s

@@ -352,3 +352,15 @@ class MockGestureRecognizer(BaseGestureRecognizer):
                 bbox=HandBBox(x1=150.0, y1=120.0, x2=280.0, y2=320.0),
             )
         ]
+
+
+# Export HagridGestureRecognizer for unified backend access
+from src.agents.gesture.hagrid_gesture_recognizer import HagridGestureRecognizer  # noqa: E402
+
+__all__ = [
+    "BaseGestureRecognizer",
+    "LightweightGestureRecognizer",
+    "MockGestureRecognizer",
+    "HagridGestureRecognizer",
+]
+

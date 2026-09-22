@@ -61,14 +61,14 @@ This project proposes a lightweight **Multi-Agent AI Framework** that combines m
 
 | Agent | Responsibility |
 |--------|----------------|
-|  Voice Agent | Converts speech into text and extracts user commands. |
-|  Gesture Agent | Detects pointing direction and hand gestures. |
-|  Vision Agent | Detects objects, obstacles, and environmental context. |
-|  Coordinator Agent | Combines outputs from all perception agents to determine user intent. |
-|  Safety Agent | Validates whether the requested action is safe before execution. |
-|  Memory Agent | Stores previous commands, user preferences, and object locations. |
-|  Task Planner Agent | Generates an ordered sequence of actions required to complete the task. |
-|  Safety Agent | Ensures that the execution would be safe. |
+|  Voice Agent | Converts speech into text and extracts structured user commands, target objects, and urgency. |
+|  Gesture Agent | Uses a pretrained HaGRID gesture detection model for visual gesture recognition. Detected gestures are converted into the project's `GestureType` schema, while spatial grounding is performed at the application level for directional pointing (`POINT_LEFT`, `POINT_FORWARD`, `POINT_RIGHT`). |
+|  Vision Agent | Detects objects, obstacles, spatial sectors, and visual proximity context using YOLO. |
+|  Coordinator Agent | Fuses multimodal outputs across modalities (LangGraph StateGraph) to determine unified human intent. |
+|  Memory Agent | Stores conversational history and resolves referential ambiguity (e.g., pronoun grounding). |
+|  Task Planner Agent | Decomposes high-level multimodal tasks into primitive executable robot action sequences. |
+|  Safety Agent | Multi-tier safety guard evaluating deterministic hard constraints, proximity hysteresis, LLM contextual risks, and human-in-the-loop review. |
+|  Robot Controller | Translates safety-approved plans into hardware velocity/discrete actions (ROS2 / Simulation). |
 
 ---
 

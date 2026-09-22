@@ -6,6 +6,7 @@ import numpy as np
 from src.agents.base import BaseAgent
 from src.agents.gesture.recognizer import (
     BaseGestureRecognizer,
+    HagridGestureRecognizer,
     LightweightGestureRecognizer,
     MockGestureRecognizer,
 )
@@ -73,14 +74,29 @@ class GestureAgent(BaseAgent):
         """Initialize the configured gesture recognizer backend."""
         if self.recognizer is None:
             gesture_cfg = self.config.get("gesture", {})
-            backend = gesture_cfg.get("backend", "lightweight").lower()
+            backend = gesture_cfg.get("backend", "hagrid").lower()
             conf_thresh = gesture_cfg.get("confidence_threshold", self._confidence_threshold)
 
             if backend == "mock":
                 self.recognizer = MockGestureRecognizer(
                     confidence_threshold=conf_thresh
                 )
+            elif backend == "lightweight":
+                self.recognizer = LightweightGestureRecognizer(
+                    confidence_threshold=conf_thresh
+                )
+            elif backend == "hagrid":
+                model_path = gesture_cfg.get("model_path", "models/hagrid/yolov10n_hagrid.pt")
+                device = gesture_cfg.get("device", "cpu")
+                self.recognizer = HagridGestureRecognizer(
+                    model_path=model_path,
+                    confidence_threshold=conf_thresh,
+                    device=device,
+                )
             else:
+                self.logger.warning(
+                    f"Unknown gesture backend '{backend}'. Falling back to LightweightGestureRecognizer."
+                )
                 self.recognizer = LightweightGestureRecognizer(
                     confidence_threshold=conf_thresh
                 )

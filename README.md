@@ -1,157 +1,723 @@
-# Adaptive Multimodal Human-Robot Communication Using a Multi-Agent AI Framework with Safety-Aware Decision Making
 
-> An Agentic AI framework that enables robots to understand human commands through speech, gestures, and vision while ensuring safe decision-making.
+# Adaptive Multimodal Human–Robot Communication Using a Multi-Agent AI Framework with Safety-Aware Decision Making
 
----
+## Overview
 
-## Project Overview
+This project presents an adaptive multimodal Human–Robot Interaction (HRI) framework that enables robots to interpret human instructions through multiple communication modalities and make context-aware, safety-conscious decisions.
 
-Human-Robot Interaction (HRI) plays a vital role in enabling intuitive communication between humans and intelligent robotic systems. Most existing HRI systems rely on a single communication modality, such as speech or vision, making them vulnerable to noisy environments, ambiguous commands, and unsafe task execution.
+The system combines:
 
-This project proposes a lightweight **Multi-Agent AI Framework** that combines multiple intelligent agents to understand human intentions using **speech recognition, gesture recognition, and computer vision**. Before executing any action, a dedicated **Safety Agent** evaluates the environment to prevent unsafe operations. Additional agents such as **Memory**, **Task Planner** and **Safety** improve contextual understanding, autonomous planning, and user trust.
+- Speech
+- Hand gestures
+- Visual perception
+- Multimodal fusion
+- Contextual memory
+- Task planning
+- Safety verification
+- Human-in-the-loop (HITL) decision making
+- ROS 2-based robot control
 
----
-
-##  Objectives
-
-- Develop a **Voice Agent** for speech command recognition.
-- Develop a **Gesture Agent** for pointing and hand gesture recognition.
-- Develop a **Vision Agent** for object detection and scene understanding.
-- Design a **Coordinator Agent** to fuse information from multiple agents.
-- Develop a **Safety Agent** to evaluate environmental risks before execution.
-- Develop a **Memory Agent** to store user preferences and previous interactions.
-- Develop a **Task Planner Agent** for autonomous task decomposition and planning.
-- Develop a **Safety Agent** for safe execution of instructions in a human-robot proximity environment
-- Compare multimodal interaction with voice-only interaction in terms of accuracy and safety.
+The primary objective is to enable reliable human–robot communication when instructions may be incomplete, ambiguous, contextual, or conflicting across different modalities.
 
 ---
 
-##  Proposed Architecture
+## System Architecture
 
+```text
+                         HUMAN
+                           │
+             ┌─────────────┼─────────────┐
+             │             │             │
+             ▼             ▼             ▼
+       Voice Agent    Gesture Agent   Vision Agent
+             │             │             │
+             └─────────────┼─────────────┘
+                           ▼
+                 ┌─────────────────────┐
+                 │  Coordinator Agent  │
+                 │ Multimodal Fusion & │
+                 │ Target Grounding    │
+                 └──────────┬──────────┘
+                            ▼
+                 ┌─────────────────────┐
+                 │    Memory Agent     │
+                 │ Context & Pronouns  │
+                 └──────────┬──────────┘
+                            ▼
+                 ┌─────────────────────┐
+                 │    Task Planner     │
+                 │ Action Decomposition│
+                 └──────────┬──────────┘
+                            ▼
+                 ┌─────────────────────┐
+                 │    Safety Agent     │
+                 │ Rules + HITL +      │
+                 │ Safety Verification │
+                 └──────────┬──────────┘
+                            ▼
+                 ┌─────────────────────┐
+                 │  Robot Controller   │
+                 │       ROS 2         │
+                 └─────────────────────┘
 ```
-                   Human User
-                        │
-      ┌─────────────────┼─────────────────┐
-      │                 │                 │
-  Voice Input     Hand Gesture      Camera Feed
-      │                 │                 │
-      ▼                 ▼                 ▼
- Voice Agent      Gesture Agent     Vision Agent
-      │                 │                 │
-      └─────────────────┼─────────────────┘
-                        ▼
-                Coordinator Agent
-                        │
-        ┌───────────────┼────────────────┐
-        │               │                │
-        ▼               ▼                ▼
-  Memory Agent   Task Planner     Safety Agent
-                        │                │
-                        └──────┬─────────┘
-                               ▼
-                      Robot Controller
-                               │
-                               ▼
-                          Robot Action
+
+### Processing Pipeline
+
+```text
+Human Input
+     ↓
+Multimodal Perception
+     ↓
+Intent & Target Fusion
+     ↓
+Contextual Reasoning
+     ↓
+Task Planning
+     ↓
+Safety Verification
+     ↓
+Human Confirmation (when required)
+     ↓
+Robot Execution
 ```
 
 ---
 
-##  Multi-Agent Framework
+# Key Components
 
-| Agent | Responsibility |
-|--------|----------------|
-|  Voice Agent | Converts speech into text and extracts structured user commands, target objects, and urgency. |
-|  Gesture Agent | Uses a pretrained HaGRID gesture detection model for visual gesture recognition. Detected gestures are converted into the project's `GestureType` schema, while spatial grounding is performed at the application level for directional pointing (`POINT_LEFT`, `POINT_FORWARD`, `POINT_RIGHT`). |
-|  Vision Agent | Detects objects, obstacles, spatial sectors, and visual proximity context using YOLO. |
-|  Coordinator Agent | Fuses multimodal outputs across modalities (LangGraph StateGraph) to determine unified human intent. |
-|  Memory Agent | Stores conversational history and resolves referential ambiguity (e.g., pronoun grounding). |
-|  Task Planner Agent | Decomposes high-level multimodal tasks into primitive executable robot action sequences. |
-|  Safety Agent | Multi-tier safety guard evaluating deterministic hard constraints, proximity hysteresis, LLM contextual risks, and human-in-the-loop review. |
-|  Robot Controller | Translates safety-approved plans into hardware velocity/discrete actions (ROS2 / Simulation). |
+## 1. Voice Agent
 
----
+The Voice Agent converts spoken instructions into structured commands.
 
-##  Technologies Used
+### Processing Pipeline
 
-- Python
-- OpenCV
-- MediaPipe
-- YOLO26n / YOLOv8
-- Whisper / Vosk (Speech Recognition)
-- LangChain
-- LangGraph
-- CrewAI
-- Ollama / Llama 3
-- ROS2 (Future Integration)
+```text
+Audio
+  ↓
+Audio Preprocessing
+  ↓
+Voice Activity Detection
+  ↓
+Whisper ASR
+  ↓
+Intent & Slot Extraction
+  ↓
+Structured Voice Output
+```
 
----
+The system supports task-oriented commands such as:
 
-##  Datasets
+- `pick_and_place`
+- `navigate_to`
+- `stop_robot`
+- `inspect_object`
 
-| Module | Dataset |
-|--------|---------|
-| Speech Recognition | Google Speech Commands Dataset |
-| Gesture Recognition | HaGRID Dataset |
-| Object Detection | COCO Dataset |
-| Safety Detection | Custom Dataset (Obstacle and Unsafe Object Scenarios) |
+The structured output can contain:
 
-*Large datasets are not stored in this repository. Download instructions are provided in the `datasets/README.md` file.*
+- Action
+- Target object
+- Urgency
+- Confidence
 
 ---
 
-##  Evaluation Metrics
+## 2. Gesture Agent
 
-- Speech Recognition Accuracy
-- Gesture Recognition Accuracy
-- Object Detection Accuracy (mAP)
-- Command Interpretation Accuracy
-- Safety Detection Accuracy
-- Response Time
-- Task Completion Rate
-- User Satisfaction
+The Gesture Agent interprets hand gestures using MediaPipe Hands and geometric landmark-based classification.
+
+The current implementation supports gestures including:
+
+- `STOP`
+- `POINT_LEFT`
+- `POINT_RIGHT`
+- `POINT_FORWARD`
+- `NO_GESTURE`
+
+The classifier uses hand landmark geometry to determine finger extension and pointing direction.
+
+> HaGRIDv2 is treated as an external benchmark/reference dataset. The current real-time gesture classifier is MediaPipe-based and rule-based and is not trained on HaGRIDv2.
 
 ---
 
-## 📁 Project Structure
+## 3. Vision Agent
+
+The Vision Agent uses a YOLO-based object detector to identify objects in the camera scene.
+
+The output includes:
+
+- Object class
+- Confidence score
+- Bounding box
+- Spatial sector
+- Proximity information
+
+The image is divided into three spatial sectors:
+
+```text
+┌──────────┬──────────┬──────────┐
+│   LEFT   │  CENTER  │  RIGHT   │
+└──────────┴──────────┴──────────┘
+```
+
+Spatial information is used by the Coordinator for multimodal target grounding.
+
+---
+
+## 4. Coordinator Agent
+
+The Coordinator performs multimodal fusion of:
+
+- Voice
+- Gesture
+- Vision
+
+It determines:
+
+- Intended action
+- Target object
+- Modality agreement or conflict
+- Target grounding
+- Confidence
+
+The implementation uses a state-based workflow for multimodal coordination.
+
+Possible processing outcomes include:
+
+- `VALID`
+- `LOW_CONFIDENCE`
+- `MODALITY_CONFLICT`
+- `TARGET_NOT_FOUND`
+- `INVALID_INPUT`
+
+### Referential Target Grounding
+
+The system can resolve deictic commands such as:
+
+> "Pick it up."
+
+using information from:
+
+- Current visual detections
+- Gesture direction
+- Object confidence
+- Spatial information
+- Previous interaction context
+
+When the available evidence is insufficient or ambiguous, the interpretation can be passed to the safety layer for further verification or human confirmation.
+
+---
+
+## 5. Memory Agent
+
+The Memory Agent provides short-term contextual reasoning.
+
+It allows subsequent commands to refer to objects or actions mentioned previously.
+
+Example:
+
+```text
+Human: Pick up the apple.
+       ↓
+Target: apple
+
+Human: Pick it up.
+       ↓
+"it" → apple
+```
+
+The current implementation uses structured conversation history and contextual resolution.
+
+---
+
+## 6. Task Planner
+
+The Task Planner converts interpreted commands into executable task steps.
+
+Supported task types include:
+
+- Navigation
+- Pick-and-place
+- Inspection
+- Stop
+
+The planner separates task interpretation from robot execution, allowing the Safety Agent to verify planned actions before execution.
+
+---
+
+## 7. Safety Agent
+
+The Safety Agent provides a safety verification layer between task planning and robot execution.
+
+It considers factors such as:
+
+- Emergency stop conditions
+- Obstacle distance
+- Sensor validity
+- Target availability
+- Perception confidence
+- Invalid task states
+- Human confirmation requirements
+
+Possible safety outcomes include:
+
+```text
+SAFE
+STOP
+UNSAFE
+HUMAN_CONFIRMATION_REQUIRED
+```
+
+### Safety Workflow
+
+```text
+Task Plan
+    ↓
+Safety Verification
+    ↓
+ ┌───────────────────┐
+ │ Is execution safe?│
+ └─────────┬─────────┘
+           │
+      ┌────┴────┐
+      │         │
+     YES        NO
+      │         │
+      ▼         ▼
+ Robot       Block /
+Execution    Stop /
+             Human Confirmation
+```
+
+---
+
+# Technologies Used
+
+| Component | Technology |
+|---|---|
+| Programming | Python |
+| Speech Recognition | Whisper |
+| Voice Activity Detection | RMS-based VAD |
+| Gesture Recognition | MediaPipe Hands + Geometric Rules |
+| Object Detection | YOLO / Ultralytics |
+| Multimodal Coordination | LangGraph / State-Based Workflow |
+| Context Management | Structured Memory |
+| Task Planning | Deterministic Task Planner |
+| Safety | Deterministic Rules + HITL |
+| Robot Middleware | ROS 2 |
+| Simulation | Gazebo |
+| Computer Vision | OpenCV |
+| Testing | Pytest |
+| Version Control | Git / GitHub |
+
+---
+
+# Project Structure
 
 ```text
 Adaptive-Multimodal-HRI-Agentic-AI/
-├── configs/                       # Configuration files (.yaml / .json)
-├── datasets/                      # Speech, gesture, and vision datasets
-│   ├── Gesture_dataset/
-│   └── Speech_commands/
-├── report/                        # Architecture reports and system design documents
-├── scripts/                       # Executable scripts and CLI utilities
+│
 ├── src/
 │   ├── agents/
-│   │   └── vision/                # Vision perception agent module
-│   ├── common/                    # Shared schemas, utilities, and exceptions
-│   ├── pipeline/                  # End-to-end multi-agent pipelines
-│   └── utils/                     # Device drivers, cameras, and helpers
-├── tests/                         # Unit and integration test suite
-├── .gitignore                     # Git ignore file
-├── requirements.txt               # Project dependencies
+│   │   ├── voice/
+│   │   ├── gesture/
+│   │   ├── vision/
+│   │   ├── coordinator/
+│   │   ├── memory/
+│   │   ├── planner/
+│   │   └── safety/
+│   │
+│   └── pipeline/
+│
+├── scripts/
+│   ├── run_vision.py
+│   ├── test_live_vision.py
+│   └── test_live_gesture.py
+│
+├── datasets/
+│   ├── Gesture_dataset/
+│   └── Speech_commands/
+│
+├── data/
+│   ├── README.md
+│   └── coco_subset/
+│
+├── evaluation/
+│   ├── test_cases.json
+│   ├── run_evaluation.py
+│   ├── metrics.py
+│   ├── evaluators/
+│   └── results/
+│
+├── tests/
+│
+├── requirements.txt
 └── README.md
 ```
 
 ---
 
-## 🔮 Future Roadmap
+# Dataset and Evaluation
 
-- Vision Agent (YOLO26n object detection & spatial scene grounding)
-- Gesture Agent (YOLO Pose / MediaPipe body & hand gesture perception)
-- Voice Agent (Whisper Speech-to-Text)
-- Coordinator Agent (Multimodal LLM Intent Fusion)
-- Contextual Memory Agent (Vector embeddings & retrieval)
-- Task Planner Agent (Constrained robot action sequencing)
-- Safety Agent (Deterministic rules & LLM contextual risk assessment)
-- ROS2 Integration (Robot controller execution layer)
+The project uses separate evaluation levels for perception, multimodal interaction, and software verification.
+
+## 1. COCO 2017 Vision Benchmark
+
+A lightweight subset of the COCO 2017 validation dataset is used to evaluate the Vision Agent.
+
+### Dataset Subset
+
+- **41 images**
+- **253 ground-truth bounding boxes**
+- **7 target object classes**
+
+Target classes:
+
+```text
+person
+bottle
+cup
+chair
+couch
+potted plant
+laptop
+```
+
+Ground-truth bounding-box annotations are retained for valid object-detection evaluation.
+
+### Vision Evaluation Results
+
+| Metric | Result |
+|---|---:|
+| Precision | 79.8% |
+| Recall | 42.5% |
+| Mean IoU | 87.2% |
+| mAP@50 | 41.3% |
+| mAP@50:95 | 33.6% |
+
+These results correspond specifically to the 41-image COCO validation mini-subset and should not be interpreted as performance over the complete COCO dataset.
 
 ---
 
-## 📄 License
+## 2. Scenario-Based HRI Evaluation
 
-This project is released under the MIT License.
+The complete multimodal HRI system is evaluated using **21 predefined scenarios**.
 
+The scenarios cover:
 
+- Multimodal agreement
+- Multimodal conflicts
+- Target grounding
+- Missing targets
+- Ambiguity
+- Emergency stop
+- Obstacle safety
+- Low-confidence inputs
+- Contextual references
+- Human-in-the-loop intervention
+- Sensor validity
+- Stop-command priority
+
+### Current Evaluation Result
+
+```text
+Total scenarios: 21
+Passed:          21
+Failed:           0
+Pass rate:      100%
+```
+
+The 100% result represents **scenario-level functional performance on the predefined 21 test cases**. It is not intended to represent general real-world accuracy across arbitrary human–robot interactions.
+
+---
+
+## 3. Software Regression Testing
+
+The project includes an automated regression test suite.
+
+Current result:
+
+```text
+153 tests passed
+0 tests failed
+```
+
+The regression tests verify the implemented modules and help ensure that changes to the project do not break existing functionality.
+
+---
+
+# Evaluation Metrics
+
+The evaluation framework supports metrics appropriate to each subsystem.
+
+### Voice
+
+- Intent accuracy
+- Target extraction accuracy
+- Word Error Rate (WER) when reference transcripts are available
+
+### Gesture
+
+- Accuracy
+- Precision
+- Recall
+- F1-score
+- Confusion matrix
+
+### Vision
+
+- Precision
+- Recall
+- Intersection over Union (IoU)
+- mAP@50
+- mAP@50:95
+
+### Multimodal Fusion
+
+- Target grounding accuracy
+- Conflict detection
+- Ambiguity handling
+- Context/pronoun resolution
+
+### Safety
+
+- Safety decision correctness
+- Correct blocking
+- Human confirmation handling
+- Unsafe-action prevention
+
+### System
+
+- Scenario pass rate
+- Task completion
+- Software decision-pipeline latency
+
+---
+
+# Running the Project
+
+## 1. Clone the Repository
+
+```bash
+git clone https://github.com/Dhivya196/Adaptive-Multimodal-HRI-Agentic-AI.git
+cd Adaptive-Multimodal-HRI-Agentic-AI
+```
+
+## 2. Create a Virtual Environment
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+## 3. Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+# Running the Evaluation
+
+Run the 21 scenario evaluation:
+
+```bash
+python3 evaluation/run_evaluation.py
+```
+
+Evaluation results are saved to:
+
+```text
+evaluation/results/
+├── evaluation_results.json
+├── evaluation_results.csv
+└── evaluation_summary.md
+```
+
+---
+
+# Running Tests
+
+Run the complete regression test suite:
+
+```bash
+pytest tests/
+```
+
+For verbose output:
+
+```bash
+pytest tests/ -v
+```
+
+---
+
+# Vision Evaluation
+
+The COCO mini-subset evaluation can be run using:
+
+```bash
+python3 scripts/evaluate_vision_coco.py
+```
+
+The evaluation uses the corresponding COCO ground-truth annotations.
+
+Dataset metadata and acquisition information are documented in:
+
+```text
+data/README.md
+```
+
+Large binary datasets and image files are excluded from GitHub where appropriate.
+
+---
+
+# ROS 2 Integration
+
+The system is designed to interface with a ROS 2-based robot controller.
+
+The control architecture separates the AI decision layer from robot execution:
+
+```text
+AI Decision Layer
+       ↓
+Safety Verification
+       ↓
+ROS 2 Controller
+       ↓
+Robot
+```
+
+The current implementation supports the software control pipeline and ROS 2 command publishing.
+
+The project should not be interpreted as a complete physical manipulation system. Pick-and-place execution is currently represented through the task-planning and control pipeline, with mock or simulated execution where applicable.
+
+---
+
+# Example Multimodal Interaction
+
+A multimodal interaction can combine speech, gesture, and vision:
+
+```text
+Speech:
+"Pick it up."
+
+        +
+
+Gesture:
+POINT_RIGHT
+
+        +
+
+Vision:
+Detected objects in the scene
+
+        ↓
+
+Coordinator
+        ↓
+Target Grounding
+        ↓
+Confidence Assessment
+        ↓
+Memory / Context
+        ↓
+Task Planner
+        ↓
+Safety Agent
+        ↓
+Robot Controller
+```
+
+This allows the system to use multiple sources of information rather than relying exclusively on a single modality.
+
+---
+
+# Safety-Aware Decision Making
+
+A central feature of the project is the separation between **task interpretation** and **safety verification**.
+
+Instead of directly executing every interpreted command:
+
+```text
+Human Command
+      ↓
+Multimodal Interpretation
+      ↓
+Task Planning
+      ↓
+Safety Verification
+      ↓
+Robot Execution
+```
+
+Uncertain or potentially unsafe situations can be stopped, rejected, or routed through human confirmation before execution.
+
+---
+
+# Limitations
+
+The current prototype has the following limitations:
+
+- The complete HRI evaluation is based on 21 predefined scenarios.
+- The COCO evaluation uses a 41-image mini-subset rather than the complete COCO dataset.
+- Scenario-level results do not represent statistical generalization to arbitrary real-world interactions.
+- The current gesture classifier is MediaPipe/rule based and is not trained on HaGRIDv2.
+- WER is not reported without appropriate reference transcripts.
+- Physical robot manipulation is not fully implemented.
+- Current latency measurements represent the software decision pipeline and do not include complete physical actuator or robot-motion latency.
+- Large-scale real-world HRI testing remains future work.
+
+---
+
+# Future Work
+
+Future development may include:
+
+- Larger multimodal HRI datasets
+- More diverse real-world environments
+- Improved speech and gesture recognition
+- Learned multimodal fusion
+- Improved uncertainty-aware target grounding
+- More comprehensive human-proximity safety monitoring
+- Physical robot manipulation experiments
+- Hardware-in-the-loop evaluation
+- Large-scale user studies
+- Expanded ROS 2 and Gazebo integration
+
+---
+
+# Evaluation Summary
+
+| Evaluation Area | Current Result |
+|---|---:|
+| Vision Dataset | COCO 2017 mini-subset |
+| Vision Images | 41 |
+| Vision Ground-Truth Boxes | 253 |
+| Vision Precision | 79.8% |
+| Vision Recall | 42.5% |
+| Vision Mean IoU | 87.2% |
+| Vision mAP@50 | 41.3% |
+| Vision mAP@50:95 | 33.6% |
+| HRI Scenarios | 21 |
+| HRI Scenarios Passed | 21/21 |
+| HRI Scenario Pass Rate | 100% |
+| Regression Tests | 153/153 |
+| Mean Software Pipeline Latency | 6.53 ms |
+
+---
+
+# Authors
+
+**Dhivya**  
+**Sharmista**  
+**Jatish**
+
+VIT Chennai  
+B.Tech Computer Science and Engineering (AI & Robotics)
+
+---
+
+# Academic Project
+
+This project is developed as an academic/research prototype for studying adaptive multimodal Human–Robot Interaction, agent-based task coordination, and safety-aware decision making.

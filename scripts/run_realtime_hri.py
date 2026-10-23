@@ -537,6 +537,10 @@ class RealTimeHRIOrchestrator:
         print(f"  • Target         : {intent_target}")
         print(f"  • Urgency        : {intent_urgency}")
         print(f"  • Confidence     : {voice_conf:.2f}")
+        if is_live_audio and voice_output.whisper_latency > 0:
+            print(f"  • Whisper Latency: {voice_output.whisper_latency:.2f} ms")
+            print(f"  • Intent Latency : {voice_output.intent_extraction_latency:.2f} ms")
+            print(f"  • Total Voice ms : {voice_output.total_voice_processing_latency:.2f} ms")
 
         # -------------------------------------------------------------
         # 2. GESTURE AGENT OUTPUT
@@ -790,8 +794,14 @@ class RealTimeHRIOrchestrator:
         print(f"  • Resolved Target  : {resolved_target}")
         if was_resolved:
             print(f"  • Pronoun Grounding: True ('{original_target}' -> '{resolved_target}')")
+            print(f"  • Resolution Source: historical context")
+        elif is_pronoun_target and not resolved_target:
+            print(f"  • Pronoun Grounding: Failed (No prior context in memory)")
+            print(f"  • Resolution Source: unresolved")
         else:
             print("  • Pronoun Grounding: Not needed (Explicit or Gesture Grounded target)")
+            print("  • Resolution Source: current-turn grounding / explicit")
+
 
         # Verify we only block if an explicit pronoun was requested but remained unresolved
         if is_pronoun_target and (not resolved_target or resolved_target.strip().lower() in MemoryAgent.REFERENTIAL_PRONOUNS):
@@ -995,10 +1005,16 @@ class RealTimeHRIOrchestrator:
         print("\n" + "-" * 70)
         print("  [PERFORMANCE & LATENCY PROFILING]")
         print("-" * 70)
-        print(f"  • Coordinator Fusion Latency : {timings.get('coordinator_ms', 0):.2f} ms")
-        print(f"  • Memory Grounding Latency   : {timings.get('memory_ms', 0):.2f} ms")
-        print(f"  • Task Planner Latency       : {timings.get('planner_ms', 0):.2f} ms")
-        print(f"  • Total End-to-End Pipeline  : {total_elapsed_ms:.2f} ms")
+        if voice_output.audio_preprocessing_latency > 0:
+            print(f"  • Audio Preprocessing Latency : {voice_output.audio_preprocessing_latency:.2f} ms")
+        if voice_output.whisper_latency > 0:
+            print(f"  • Whisper Inference Latency   : {voice_output.whisper_latency:.2f} ms")
+        if voice_output.intent_extraction_latency > 0:
+            print(f"  • Intent Extraction Latency   : {voice_output.intent_extraction_latency:.2f} ms")
+        print(f"  • Coordinator Fusion Latency  : {timings.get('coordinator_ms', 0):.2f} ms")
+        print(f"  • Memory Grounding Latency    : {timings.get('memory_ms', 0):.2f} ms")
+        print(f"  • Task Planner Latency        : {timings.get('planner_ms', 0):.2f} ms")
+        print(f"  • Total End-to-End Pipeline   : {total_elapsed_ms:.2f} ms")
 
         # -------------------------------------------------------------
         # 8. DEBUG DIAGNOSTIC SUMMARY (If --debug is enabled)
@@ -1029,7 +1045,13 @@ class RealTimeHRIOrchestrator:
             print(f"    status: {task_status.value if hasattr(task_status, 'value') else task_status}")
             print(f"    sector: {sec_val}")
             print("  MEMORY")
+            ref_det = original_target if is_pronoun_target else "NO"
+            prev_tgt_found = resolved_dict.get("previous_target_found") or "NONE"
+            res_src = resolved_dict.get("resolution_source", "current-turn / explicit")
+            print(f"    reference detected: {ref_det}")
+            print(f"    previous target found: {prev_tgt_found}")
             print(f"    resolved target: {resolved_target}")
+            print(f"    resolution source: {res_src}")
             print("  PLANNER")
             print(f"    plan id: {plan.plan_id}")
             print(f"    total steps: {len(plan.steps)}")

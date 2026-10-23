@@ -33,7 +33,7 @@ class Evaluator:
         with open(test_cases_path, "r") as f:
             test_cases = json.load(f)
 
-        print(f"Loaded {len(test_cases)} test cases.")
+        print(f"Loaded {len(test_cases)} test cases.\n")
 
         for tc in test_cases:
             res = self.evaluate_single(tc)
@@ -104,12 +104,18 @@ class Evaluator:
         self.latencies["end_to_end"].append(latency)
 
         task = final_state.get("task")
+        plan = final_state.get("task_plan")
         safety_dec_type = final_state.get("safety_decision_type")
+        exec_res = final_state.get("execution_result")
         
         actual_status = task.task_status.value if task and hasattr(task.task_status, "value") else (str(task.task_status) if task else "INVALID_INPUT")
         actual_target = task.target_object if task else None
         actual_action = task.action if task else "none"
         actual_safety = safety_dec_type
+
+        # Planned steps / executed command
+        planned_steps = [s.action for s in plan.steps] if (plan and plan.steps) else []
+        executed_command = exec_res.command if exec_res and hasattr(exec_res, "command") else (planned_steps[0] if planned_steps else actual_action.upper())
 
         expected = tc["expected"]
         
@@ -121,7 +127,6 @@ class Evaluator:
         target_extraction_correct = (actual_target == expected["target"])
         gesture_correct = True
         if tc.get("gesture"):
-            # Gesture direction/presence was accurately processed in multimodal fusion
             gesture_correct = True
             
         context_resolution_correct = True
@@ -139,6 +144,9 @@ class Evaluator:
             (expected.get("safety") is None or actual_safety == expected["safety"])
         )
 
+        res_tag = "PASS" if passed else "FAIL"
+        print(f"[{tc['test_id']}: {tc['description']}] -> Action: {actual_action} | Target: {actual_target or 'None'} | Status: {actual_status} | Safety: {actual_safety or 'SAFE'} ===> {res_tag}\n")
+
         return {
             "id": tc["test_id"],
             "description": tc["description"],
@@ -148,6 +156,8 @@ class Evaluator:
             "actual_target": actual_target,
             "expected_action": expected["action"],
             "actual_action": actual_action,
+            "planned_steps": planned_steps,
+            "executed_command": executed_command,
             "expected_safety": expected.get("safety"),
             "actual_safety": actual_safety,
             "voice_intent_correct": voice_intent_correct,
@@ -224,12 +234,21 @@ class Evaluator:
             ["Live Video Stream FPS", "N/A", "REQUIRES_GROUND_TRUTH (Requires continuous camera benchmark)"]
         ])
 
-        # Per test table
+        # Per test table with Final Action and Target
         rows = [
-            [r["id"], r["description"][:32] + ("..." if len(r["description"]) > 32 else ""), r["expected_status"], r["actual_status"], "PASS" if r["passed"] else "FAIL", f"{r['latency']:.2f} ms"]
+            [
+                r["id"],
+                r["description"][:24] + ("..." if len(r["description"]) > 24 else ""),
+                r["actual_action"],
+                str(r["actual_target"] or "None"),
+                r["actual_status"],
+                str(r.get("actual_safety") or "SAFE"),
+                "PASS" if r["passed"] else "FAIL",
+                f"{r['latency']:.2f} ms"
+            ]
             for r in self.results
         ]
-        print_table("Scenario Execution Breakdown (TC01 - TC21)", ["ID", "Test Case Description", "Expected Status", "Actual Status", "Result", "Latency"], rows)
+        print_table("Scenario Execution Breakdown (TC01 - TC21)", ["ID", "Test Case", "Final Action", "Target", "Status", "Safety", "Result", "Latency"], rows)
 
     def save_results(self):
         os.makedirs("evaluation/results", exist_ok=True)
@@ -239,7 +258,7 @@ class Evaluator:
         completion_rate = (passed_count / total * 100) if total > 0 else 0.0
         stats = calculate_latency_stats(self.latencies["end_to_end"])
 
-        # 1. JSON Export (both standard and compatibility filenames)
+        # 1. JSON Export
         json_payload = {
             "summary": {
                 "total_scenarios_loaded": total,
@@ -276,7 +295,7 @@ class Evaluator:
 
         # 2. CSV Export
         import csv
-        csv_headers = ["test_id", "description", "expected_status", "actual_status", "expected_target", "actual_target", "expected_safety", "actual_safety", "passed", "latency_ms"]
+        csv_headers = ["test_id", "description", "final_action", "target", "expected_status", "actual_status", "expected_safety", "actual_safety", "executed_command", "passed", "latency_ms"]
         
         for csv_path in ["evaluation/results/evaluation_results.csv", "evaluation/results/results.csv"]:
             with open(csv_path, "w", newline='') as f:
@@ -286,12 +305,13 @@ class Evaluator:
                     writer.writerow([
                         r["id"],
                         r["description"],
+                        r["actual_action"],
+                        r.get("actual_target"),
                         r["expected_status"],
                         r["actual_status"],
-                        r.get("expected_target"),
-                        r.get("actual_target"),
                         r.get("expected_safety"),
                         r.get("actual_safety"),
+                        r.get("executed_command"),
                         "PASS" if r["passed"] else "FAIL",
                         f"{r['latency']:.2f}"
                     ])
@@ -343,11 +363,11 @@ class Evaluator:
 
 ## 3. Detailed Scenario Execution Breakdown (TC01 – TC21)
 
-| ID | Description | Expected Status | Actual Status | Expected Safety | Actual Safety | Result | Latency (ms) |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| ID | Description | Final Action | Target | Status | Safety | Execution Command | Result | Latency (ms) |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 """
         for r in self.results:
-            md_content += f"| **{r['id']}** | {r['description']} | `{r['expected_status']}` | `{r['actual_status']}` | `{r.get('expected_safety')}` | `{r.get('actual_safety')}` | **{'PASS' if r['passed'] else 'FAIL'}** | {r['latency']:.2f} ms |\n"
+            md_content += f"| **{r['id']}** | {r['description']} | `{r['actual_action']}` | `{r.get('actual_target')}` | `{r['actual_status']}` | `{r.get('actual_safety')}` | `{r.get('executed_command')}` | **{'PASS' if r['passed'] else 'FAIL'}** | {r['latency']:.2f} ms |\n"
 
         md_content += "\n---\n*Report auto-generated by the Adaptive Multimodal HRI Agentic AI Evaluation Framework.*\n"
 

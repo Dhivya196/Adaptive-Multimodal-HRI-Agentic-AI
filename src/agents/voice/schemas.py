@@ -84,6 +84,13 @@ class VoiceAgentOutput(BaseAgentOutput):
     audio_duration_sec: float = 0.0
     rms_energy: float = 0.0
     language: str = "en"
+    # Latency and Performance Profiling Metrics (ms/sec)
+    recording_duration: float = 0.0
+    audio_preprocessing_latency: float = 0.0
+    whisper_latency: float = 0.0
+    intent_extraction_latency: float = 0.0
+    total_voice_processing_latency: float = 0.0
+    timing_metrics: Dict[str, float] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         base_dict = super().to_dict()
@@ -97,5 +104,12 @@ class VoiceAgentOutput(BaseAgentOutput):
             "audio_duration_sec": round(self.audio_duration_sec, 3),
             "rms_energy": round(self.rms_energy, 5),
             "language": self.language,
+            "recording_duration": round(self.recording_duration, 3),
+            "audio_preprocessing_latency": round(self.audio_preprocessing_latency, 2),
+            "whisper_latency": round(self.whisper_latency, 2),
+            "intent_extraction_latency": round(self.intent_extraction_latency, 2),
+            "total_voice_processing_latency": round(self.total_voice_processing_latency, 2),
+            "timing_metrics": self.timing_metrics,
         })
         return base_dict
+

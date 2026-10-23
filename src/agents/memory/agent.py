@@ -163,17 +163,21 @@ class MemoryAgent(BaseAgent):
         resolved_location = location
         is_referential = False
         previous_task_info = None
+        previous_target_found = None
+        resolution_source = "explicit_input"
 
         norm_target = (target or "").strip().lower()
 
-        # Check if the target is an anaphora / pronoun or missing
-        if self._enable_pronoun_resolution and (not norm_target or norm_target in self.REFERENTIAL_PRONOUNS):
+        # Check if the target is an explicit anaphora / pronoun (e.g. 'it', 'this', 'that')
+        if self._enable_pronoun_resolution and norm_target and (norm_target in self.REFERENTIAL_PRONOUNS):
             is_referential = True
             for entry in recent_entries:
                 c = entry.content
                 prev_target = c.get("target") or entry.metadata.get("target")
                 if prev_target and str(prev_target).lower() not in self.REFERENTIAL_PRONOUNS:
+                    previous_target_found = prev_target
                     resolved_target = prev_target
+                    resolution_source = "historical context"
                     if not resolved_location:
                         resolved_location = c.get("location") or entry.metadata.get("location")
                     previous_task_info = {
@@ -184,11 +188,19 @@ class MemoryAgent(BaseAgent):
                     }
                     break
 
+            if not previous_target_found:
+                resolved_target = None
+                resolution_source = "unresolved"
+        else:
+            resolution_source = "explicit_input"
+
         return {
             "resolved_target": resolved_target,
             "resolved_location": resolved_location,
             "is_referential": is_referential,
+            "previous_target_found": previous_target_found,
             "previous_task_info": previous_task_info,
+            "resolution_source": resolution_source,
         }
 
     # ------------------------------------------------------------------
@@ -329,7 +341,24 @@ class MemoryAgent(BaseAgent):
                 resolved_target = res["resolved_target"]
                 resolved_location = res["resolved_location"]
                 is_referential = res["is_referential"]
+                prev_target_found = res["previous_target_found"]
                 prev_info = res["previous_task_info"]
+                resolution_source = res["resolution_source"]
+
+                # Trace logging for referential grounding
+                if is_referential:
+                    print("\n" + "=" * 50)
+                    print("[MEMORY]")
+                    print(f"  Reference detected    : \"{raw_target or 'it'}\"")
+                    if prev_target_found:
+                        print(f"  Previous target found : \"{prev_target_found}\"")
+                        print(f"  Resolved target       : \"{resolved_target}\"")
+                        print(f"  Resolution source     : historical context")
+                    else:
+                        print(f"  Previous target found : NONE")
+                        print(f"  Resolved target       : UNRESOLVED")
+                        print(f"  Resolution source     : unresolved")
+                    print("=" * 50 + "\n", flush=True)
 
                 # Assemble resolved content
                 resolved_context = {
@@ -340,38 +369,46 @@ class MemoryAgent(BaseAgent):
                     "location": resolved_location,
                     "confidence": confidence,
                     "original_target": raw_target,
-                    "resolved_from_previous": is_referential and (resolved_target != raw_target),
+                    "reference_detected": is_referential,
+                    "previous_target_found": prev_target_found,
+                    "resolved_from_previous": is_referential and bool(prev_target_found),
+                    "resolution_source": resolution_source,
                     "previous_task": prev_info,
-                    "status": TaskStatus.REQUESTED.value if task_status == "VALID" else TaskStatus.INVALID.value,
+                    "status": TaskStatus.REQUESTED.value if (task_status == "VALID" and resolved_target) else TaskStatus.INVALID.value,
                 }
 
-                # Store this task in memory
+                # Store this task in memory (only store resolved or explicit targets)
+                entry_content = dict(resolved_context)
+                if not resolved_target:
+                    entry_content["target"] = raw_target
+
                 entry = MemoryEntry(
                     id=assigned_task_id,
                     entry_type=MemoryEntryType.TASK,
-                    content=resolved_context,
+                    content=entry_content,
                     task_id=assigned_task_id,
                     source="coordinator",
                     metadata={
                         "raw_coordinator_output": coordinator_dict,
                         "resolved_from_previous": resolved_context["resolved_from_previous"],
+                        "resolution_source": resolution_source,
                     },
                 )
                 self.store.store(entry)
                 relevant_entries = [entry]
 
-                current_target = resolved_target
+                current_target = resolved_target or raw_target
                 current_action = raw_action
                 current_location = resolved_location
 
                 if resolved_context["resolved_from_previous"]:
                     summary_text = (
                         f"Resolved contextual task '{raw_action}': "
-                        f"target grounded to '{resolved_target}' (from previous context) at '{resolved_location}'."
+                        f"target grounded to '{resolved_target}' (from historical context) at '{resolved_location}'."
                     )
                 else:
                     summary_text = (
-                        f"Tracked task '{raw_action}' targeting '{resolved_target}' at '{resolved_location}'."
+                        f"Tracked task '{raw_action}' targeting '{resolved_target or raw_target}' at '{resolved_location}'."
                     )
             else:
                 # No specific coordinator output provided; return recent context

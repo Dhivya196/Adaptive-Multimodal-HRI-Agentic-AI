@@ -50,6 +50,7 @@ from src.agents.coordinator.fusion import MultimodalFusionEngine
 from src.agents.coordinator.schemas import (
     CoordinatorAgentInput,
     CoordinatorAgentOutput,
+    GroundingStatus,
     HRIState,
     MultimodalTask,
     TaskStatus,
@@ -226,13 +227,22 @@ def create_integrated_hri_graph(
 
         # If memory resolved a referential target (e.g. "it" -> "bottle")
         target_str = str(task.target_object or "").strip().lower()
-        if target_str in MemoryAgent.REFERENTIAL_PRONOUNS and resolved_context.get("target"):
-            task.target_object = resolved_context["target"]
-            if resolved_context.get("location") and not task.spatial_sector:
-                task.spatial_sector = resolved_context["location"]
-            task.target_confirmed = True
-            task.task_status = TaskStatus.VALID
-            task.reasoning += f" (Target resolved from memory context: {task.target_object})"
+        is_referential = bool(target_str) and (target_str in MemoryAgent.REFERENTIAL_PRONOUNS)
+
+        if is_referential:
+            if resolved_context.get("resolved_from_previous") and resolved_context.get("target"):
+                task.target_object = resolved_context["target"]
+                if resolved_context.get("location") and not task.spatial_sector:
+                    task.spatial_sector = resolved_context["location"]
+                task.target_confirmed = True
+                task.grounding_status = GroundingStatus.HIGH_CONFIDENCE
+                task.task_status = TaskStatus.VALID
+                task.reasoning += f" (Target resolved from historical memory: {task.target_object})"
+            elif not resolved_context.get("target"):
+                # Unresolved referential pronoun with empty memory
+                task.target_confirmed = False
+                task.task_status = TaskStatus.TARGET_NOT_FOUND
+                task.reasoning += f" (Target pronoun '{task.target_object}' could not be resolved from historical context)"
 
         return {
             "task": task,
@@ -256,8 +266,9 @@ def create_integrated_hri_graph(
                 error_message=f"Planning skipped for task status: {status_val}",
                 plan=None,
                 plan_status="SKIPPED_INVALID_TASK",
-                validation_errors=[f"Task status is {status_val}"],
+                validation_errors=[f"Task status is '{status_val}'"],
             )
+            print(f"\nTask planning skipped: [\"Task status is '{status_val}'. Planning not required.\"]")
             return {
                 "task_plan": None,
                 "planner_output": planner_output,
@@ -269,6 +280,13 @@ def create_integrated_hri_graph(
         )
 
         planner_output: TaskPlannerOutput = _planner.process(planner_input)
+        if planner_output.success and planner_output.plan:
+            step_actions = [s.action for s in planner_output.plan.steps]
+            print(f"\nTask plan generated: [\"Action '{task.action}' for target '{task.target_object or 'None'}' -> {', '.join(step_actions)}\"]")
+        else:
+            errors = planner_output.validation_errors or [planner_output.error_message]
+            print(f"\nTask validation: {errors}")
+
         return {
             "task_plan": planner_output.plan,
             "planner_output": planner_output,

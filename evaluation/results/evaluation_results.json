@@ -6,13 +6,13 @@
         "total_failed": 0,
         "pass_rate_percent": 100.0,
         "latency_stats_ms": {
-            "mean": 6.533622741699219,
-            "median": 6.685733795166016,
-            "min": 4.568338394165039,
-            "max": 10.151386260986328,
-            "std": 1.2658922070969267
+            "mean": 6.707214173816499,
+            "median": 6.307125091552734,
+            "min": 4.426717758178711,
+            "max": 10.904312133789062,
+            "std": 1.3251852482821054
         },
-        "timestamp": "2026-09-23T00:01:42.881175"
+        "timestamp": "2026-09-23T13:17:49.591749"
     },
     "subsystem_metrics": {
         "voice_intent_accuracy_percent": 100.0,
@@ -40,6 +40,17 @@
             "actual_target": "bottle",
             "expected_action": "pick",
             "actual_action": "pick",
+            "planned_steps": [
+                "TURN_LEFT",
+                "NAVIGATE",
+                "STOP",
+                "PICK",
+                "MOVE",
+                "STOP",
+                "PLACE",
+                "STOP"
+            ],
+            "executed_command": "TURN_LEFT",
             "expected_safety": "SAFE",
             "actual_safety": "SAFE",
             "voice_intent_correct": true,
@@ -48,7 +59,7 @@
             "context_resolution_correct": true,
             "safety_correct": true,
             "passed": true,
-            "latency": 10.151386260986328
+            "latency": 10.904312133789062
         },
         {
             "id": "T02",
@@ -59,6 +70,8 @@
             "actual_target": "bottle",
             "expected_action": "pick",
             "actual_action": "pick",
+            "planned_steps": [],
+            "executed_command": "PICK",
             "expected_safety": null,
             "actual_safety": "SAFE",
             "voice_intent_correct": true,
@@ -67,7 +80,7 @@
             "context_resolution_correct": true,
             "safety_correct": true,
             "passed": true,
-            "latency": 5.550146102905273
+            "latency": 7.774829864501953
         },
         {
             "id": "T03",
@@ -78,6 +91,8 @@
             "actual_target": "laptop",
             "expected_action": "inspect",
             "actual_action": "inspect",
+            "planned_steps": [],
+            "executed_command": "INSPECT",
             "expected_safety": null,
             "actual_safety": "UNSAFE",
             "voice_intent_correct": true,
@@ -86,7 +101,7 @@
             "context_resolution_correct": true,
             "safety_correct": true,
             "passed": true,
-            "latency": 4.568338394165039
+            "latency": 4.426717758178711
         },
         {
             "id": "T04",
@@ -97,6 +112,17 @@
             "actual_target": "laptop",
             "expected_action": "pick",
             "actual_action": "pick",
+            "planned_steps": [
+                "TURN_LEFT",
+                "NAVIGATE",
+                "STOP",
+                "PICK",
+                "MOVE",
+                "STOP",
+                "PLACE",
+                "STOP"
+            ],
+            "executed_command": "TURN_LEFT",
             "expected_safety": null,
             "actual_safety": "SAFE",
             "voice_intent_correct": true,
@@ -105,7 +131,7 @@
             "context_resolution_correct": true,
             "safety_correct": true,
             "passed": true,
-            "latency": 6.0100555419921875
+            "latency": 7.491111755371094
         },
         {
             "id": "T05",
@@ -116,6 +142,16 @@
             "actual_target": "laptop",
             "expected_action": "pick",
             "actual_action": "pick",
+            "planned_steps": [
+                "NAVIGATE",
+                "STOP",
+                "PICK",
+                "MOVE",
+                "STOP",
+                "PLACE",
+                "STOP"
+            ],
+            "executed_command": "MOVE_FORWARD",
             "expected_safety": null,
             "actual_safety": "SAFE",
             "voice_intent_correct": true,
@@ -124,7 +160,7 @@
             "context_resolution_correct": true,
             "safety_correct": true,
             "passed": true,
-            "latency": 7.305145263671875
+            "latency": 8.579015731811523
         },
         {
             "id": "T06",
@@ -135,6 +171,10 @@
             "actual_target": null,
             "expected_action": "stop_robot",
             "actual_action": "stop_robot",
+            "planned_steps": [
+                "STOP"
+            ],
+            "executed_command": "STOP",
             "expected_safety": "STOP",
             "actual_safety": "STOP",
             "voice_intent_correct": true,
@@ -143,7 +183,7 @@
             "context_resolution_correct": true,
             "safety_correct": true,
             "passed": true,
-            "latency": 4.835367202758789
+            "latency": 6.258726119995117
         },
         {
             "id": "T07",
@@ -154,6 +194,11 @@
             "actual_target": null,
             "expected_action": "move_forward",
             "actual_action": "move_forward",
+            "planned_steps": [
+                "MOVE",
+                "STOP"
+            ],
+            "executed_command": "MOVE",
             "expected_safety": "STOP",
             "actual_safety": "STOP",
             "voice_intent_correct": true,
@@ -162,7 +207,7 @@
             "context_resolution_correct": true,
             "safety_correct": true,
             "passed": true,
-            "latency": 5.815982818603516
+            "latency": 5.223751068115234
         },
         {
             "id": "T08",
@@ -173,6 +218,16 @@
             "actual_target": "laptop",
             "expected_action": "pick",
             "actual_action": "pick",
+            "planned_steps": [
+                "NAVIGATE",
+                "STOP",
+                "PICK",
+                "MOVE",
+                "STOP",
+                "PLACE",
+                "STOP"
+            ],
+            "executed_command": "MOVE_FORWARD",
             "expected_safety": "SAFE",
             "actual_safety": "SAFE",
             "voice_intent_correct": true,
@@ -181,7 +236,7 @@
             "context_resolution_correct": true,
             "safety_correct": true,
             "passed": true,
-            "latency": 6.719112396240234
+            "latency": 6.093263626098633
         },
         {
             "id": "T09",
@@ -192,6 +247,12 @@
             "actual_target": null,
             "expected_action": "explore",
             "actual_action": "explore",
+            "planned_steps": [
+                "MOVE",
+                "INSPECT",
+                "STOP"
+            ],
+            "executed_command": "MOVE_FORWARD",
             "expected_safety": "SAFE",
             "actual_safety": "SAFE",
             "voice_intent_correct": true,
@@ -200,7 +261,7 @@
             "context_resolution_correct": true,
             "safety_correct": true,
             "passed": true,
-            "latency": 6.746053695678711
+            "latency": 6.307125091552734
         },
         {
             "id": "T10",
@@ -211,6 +272,8 @@
             "actual_target": "bottle",
             "expected_action": "pick",
             "actual_action": "pick",
+            "planned_steps": [],
+            "executed_command": "PICK",
             "expected_safety": null,
             "actual_safety": "SAFE",
             "voice_intent_correct": true,
@@ -219,7 +282,7 @@
             "context_resolution_correct": true,
             "safety_correct": true,
             "passed": true,
-            "latency": 6.705284118652344
+            "latency": 5.859136581420898
         },
         {
             "id": "T11",
@@ -230,6 +293,8 @@
             "actual_target": null,
             "expected_action": "none",
             "actual_action": "none",
+            "planned_steps": [],
+            "executed_command": "NONE",
             "expected_safety": null,
             "actual_safety": "UNSAFE",
             "voice_intent_correct": true,
@@ -238,7 +303,7 @@
             "context_resolution_correct": true,
             "safety_correct": true,
             "passed": true,
-            "latency": 5.302190780639648
+            "latency": 5.627155303955078
         },
         {
             "id": "T12",
@@ -249,6 +314,12 @@
             "actual_target": "apple",
             "expected_action": "inspect",
             "actual_action": "inspect",
+            "planned_steps": [
+                "TURN_RIGHT",
+                "STOP",
+                "INSPECT"
+            ],
+            "executed_command": "TURN_RIGHT",
             "expected_safety": "SAFE",
             "actual_safety": "SAFE",
             "voice_intent_correct": true,
@@ -257,7 +328,7 @@
             "context_resolution_correct": true,
             "safety_correct": true,
             "passed": true,
-            "latency": 6.294012069702148
+            "latency": 6.299495697021484
         },
         {
             "id": "T13",
@@ -268,6 +339,16 @@
             "actual_target": "apple",
             "expected_action": "pick",
             "actual_action": "pick",
+            "planned_steps": [
+                "NAVIGATE",
+                "STOP",
+                "PICK",
+                "MOVE",
+                "STOP",
+                "PLACE",
+                "STOP"
+            ],
+            "executed_command": "MOVE_FORWARD",
             "expected_safety": "SAFE",
             "actual_safety": "SAFE",
             "voice_intent_correct": true,
@@ -276,7 +357,7 @@
             "context_resolution_correct": true,
             "safety_correct": true,
             "passed": true,
-            "latency": 6.685733795166016
+            "latency": 6.629228591918945
         },
         {
             "id": "T14",
@@ -287,6 +368,17 @@
             "actual_target": "bottle",
             "expected_action": "pick",
             "actual_action": "pick",
+            "planned_steps": [
+                "TURN_LEFT",
+                "NAVIGATE",
+                "STOP",
+                "PICK",
+                "MOVE",
+                "STOP",
+                "PLACE",
+                "STOP"
+            ],
+            "executed_command": "TURN_LEFT",
             "expected_safety": "SAFE",
             "actual_safety": "SAFE",
             "voice_intent_correct": true,
@@ -295,7 +387,7 @@
             "context_resolution_correct": true,
             "safety_correct": true,
             "passed": true,
-            "latency": 6.589412689208984
+            "latency": 7.138252258300781
         },
         {
             "id": "T15",
@@ -306,6 +398,8 @@
             "actual_target": "cup",
             "expected_action": "inspect",
             "actual_action": "inspect",
+            "planned_steps": [],
+            "executed_command": "INSPECT",
             "expected_safety": null,
             "actual_safety": "SAFE",
             "voice_intent_correct": true,
@@ -314,7 +408,7 @@
             "context_resolution_correct": true,
             "safety_correct": true,
             "passed": true,
-            "latency": 7.484912872314453
+            "latency": 7.641077041625977
         },
         {
             "id": "T16",
@@ -325,6 +419,16 @@
             "actual_target": "knife",
             "expected_action": "pick",
             "actual_action": "pick",
+            "planned_steps": [
+                "NAVIGATE",
+                "STOP",
+                "PICK",
+                "MOVE",
+                "STOP",
+                "PLACE",
+                "STOP"
+            ],
+            "executed_command": "MOVE_FORWARD",
             "expected_safety": "SAFE",
             "actual_safety": "SAFE",
             "voice_intent_correct": true,
@@ -333,7 +437,7 @@
             "context_resolution_correct": true,
             "safety_correct": true,
             "passed": true,
-            "latency": 6.746530532836914
+            "latency": 6.837606430053711
         },
         {
             "id": "T17",
@@ -344,6 +448,10 @@
             "actual_target": null,
             "expected_action": "none",
             "actual_action": "none",
+            "planned_steps": [
+                "STOP"
+            ],
+            "executed_command": "STOP",
             "expected_safety": null,
             "actual_safety": "SAFE",
             "voice_intent_correct": true,
@@ -352,7 +460,7 @@
             "context_resolution_correct": true,
             "safety_correct": true,
             "passed": true,
-            "latency": 8.671045303344727
+            "latency": 6.52313232421875
         },
         {
             "id": "T18",
@@ -363,6 +471,11 @@
             "actual_target": "box",
             "expected_action": "inspect",
             "actual_action": "inspect",
+            "planned_steps": [
+                "STOP",
+                "INSPECT"
+            ],
+            "executed_command": "STOP",
             "expected_safety": "SAFE",
             "actual_safety": "SAFE",
             "voice_intent_correct": true,
@@ -371,7 +484,7 @@
             "context_resolution_correct": true,
             "safety_correct": true,
             "passed": true,
-            "latency": 7.45081901550293
+            "latency": 7.535219192504883
         },
         {
             "id": "T19",
@@ -382,6 +495,11 @@
             "actual_target": null,
             "expected_action": "move_forward",
             "actual_action": "move_forward",
+            "planned_steps": [
+                "MOVE",
+                "STOP"
+            ],
+            "executed_command": "MOVE_FORWARD",
             "expected_safety": "SAFE",
             "actual_safety": "SAFE",
             "voice_intent_correct": true,
@@ -390,7 +508,7 @@
             "context_resolution_correct": true,
             "safety_correct": true,
             "passed": true,
-            "latency": 6.928205490112305
+            "latency": 5.744457244873047
         },
         {
             "id": "T20",
@@ -401,6 +519,11 @@
             "actual_target": null,
             "expected_action": "move_forward",
             "actual_action": "move_forward",
+            "planned_steps": [
+                "MOVE",
+                "STOP"
+            ],
+            "executed_command": "MOVE_FORWARD",
             "expected_safety": "SAFE",
             "actual_safety": "SAFE",
             "voice_intent_correct": true,
@@ -409,7 +532,7 @@
             "context_resolution_correct": true,
             "safety_correct": true,
             "passed": true,
-            "latency": 5.717277526855469
+            "latency": 6.09135627746582
         },
         {
             "id": "T21",
@@ -420,6 +543,10 @@
             "actual_target": null,
             "expected_action": "stop",
             "actual_action": "stop",
+            "planned_steps": [
+                "STOP"
+            ],
+            "executed_command": "STOP",
             "expected_safety": "SAFE",
             "actual_safety": "SAFE",
             "voice_intent_correct": true,
@@ -428,7 +555,7 @@
             "context_resolution_correct": true,
             "safety_correct": true,
             "passed": true,
-            "latency": 4.929065704345703
+            "latency": 5.866527557373047
         }
     ]
 }

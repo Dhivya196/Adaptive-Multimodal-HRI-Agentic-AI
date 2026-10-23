@@ -1,22 +1,22 @@
-test_id,description,expected_status,actual_status,expected_target,actual_target,expected_safety,actual_safety,passed,latency_ms
-T01,Voice + Vision + Gesture: Correct pointing to an object,VALID,VALID,bottle,bottle,SAFE,SAFE,PASS,10.15
-T02,Voice + Vision + Gesture: Modality conflict (points away from object),MODALITY_CONFLICT,MODALITY_CONFLICT,bottle,bottle,,SAFE,PASS,5.55
-T03,Voice + Vision: Object requested is not in scene,TARGET_NOT_FOUND,TARGET_NOT_FOUND,laptop,laptop,,UNSAFE,PASS,4.57
-T04,Voice + Vision + Gesture: Object absent from pointed sector,VALID,VALID,laptop,laptop,,SAFE,PASS,6.01
-T05,Voice + Vision + Gesture: Multiple objects in pointed sector (Ambiguous),VALID,VALID,laptop,laptop,,SAFE,PASS,7.31
-T06,Voice Only: Emergency Stop,VALID,VALID,,,STOP,STOP,PASS,4.84
-T07,Unsafe obstacle distance,VALID,VALID,,,STOP,STOP,PASS,5.82
-T08,Voice + Vision: Explicit target agreement,VALID,VALID,laptop,laptop,SAFE,SAFE,PASS,6.72
-T09,Voice only: General action without object,VALID,VALID,,,SAFE,SAFE,PASS,6.75
-T10,Low confidence voice input,LOW_CONFIDENCE,LOW_CONFIDENCE,bottle,bottle,,SAFE,PASS,6.71
-T11,Invalid Input (No relevant data),INVALID_INPUT,INVALID_INPUT,,,,UNSAFE,PASS,5.30
-T12,Multi-turn context: First command,VALID,VALID,apple,apple,SAFE,SAFE,PASS,6.29
-T13,Multi-turn context: Pronoun resolution (follows T12),VALID,VALID,apple,apple,SAFE,SAFE,PASS,6.69
-T14,Voice + Vision: Ambiguous explicit target (two bottles),VALID,VALID,bottle,bottle,SAFE,SAFE,PASS,6.59
-T15,Voice + Gesture: Modality Conflict,MODALITY_CONFLICT,MODALITY_CONFLICT,cup,cup,,SAFE,PASS,7.48
-T16,Human intervention required (medium risk),VALID,VALID,knife,knife,SAFE,SAFE,PASS,6.75
-T17,Vision + Gesture without Voice,VALID,VALID,,,,SAFE,PASS,8.67
-T18,Voice + Vision + Gesture: Perfect agreement,VALID,VALID,box,box,SAFE,SAFE,PASS,7.45
-T19,Unsafe distance (Human too close),VALID,VALID,,,SAFE,SAFE,PASS,6.93
-T20,Sensor validity failed,VALID,VALID,,,SAFE,SAFE,PASS,5.72
-T21,Stop command overrides everything,VALID,VALID,,,SAFE,SAFE,PASS,4.93
+test_id,description,final_action,target,expected_status,actual_status,expected_safety,actual_safety,executed_command,passed,latency_ms
+T01,Voice + Vision + Gesture: Correct pointing to an object,pick,bottle,VALID,VALID,SAFE,SAFE,TURN_LEFT,PASS,10.90
+T02,Voice + Vision + Gesture: Modality conflict (points away from object),pick,bottle,MODALITY_CONFLICT,MODALITY_CONFLICT,,SAFE,PICK,PASS,7.77
+T03,Voice + Vision: Object requested is not in scene,inspect,laptop,TARGET_NOT_FOUND,TARGET_NOT_FOUND,,UNSAFE,INSPECT,PASS,4.43
+T04,Voice + Vision + Gesture: Object absent from pointed sector,pick,laptop,VALID,VALID,,SAFE,TURN_LEFT,PASS,7.49
+T05,Voice + Vision + Gesture: Multiple objects in pointed sector (Ambiguous),pick,laptop,VALID,VALID,,SAFE,MOVE_FORWARD,PASS,8.58
+T06,Voice Only: Emergency Stop,stop_robot,,VALID,VALID,STOP,STOP,STOP,PASS,6.26
+T07,Unsafe obstacle distance,move_forward,,VALID,VALID,STOP,STOP,MOVE,PASS,5.22
+T08,Voice + Vision: Explicit target agreement,pick,laptop,VALID,VALID,SAFE,SAFE,MOVE_FORWARD,PASS,6.09
+T09,Voice only: General action without object,explore,,VALID,VALID,SAFE,SAFE,MOVE_FORWARD,PASS,6.31
+T10,Low confidence voice input,pick,bottle,LOW_CONFIDENCE,LOW_CONFIDENCE,,SAFE,PICK,PASS,5.86
+T11,Invalid Input (No relevant data),none,,INVALID_INPUT,INVALID_INPUT,,UNSAFE,NONE,PASS,5.63
+T12,Multi-turn context: First command,inspect,apple,VALID,VALID,SAFE,SAFE,TURN_RIGHT,PASS,6.30
+T13,Multi-turn context: Pronoun resolution (follows T12),pick,apple,VALID,VALID,SAFE,SAFE,MOVE_FORWARD,PASS,6.63
+T14,Voice + Vision: Ambiguous explicit target (two bottles),pick,bottle,VALID,VALID,SAFE,SAFE,TURN_LEFT,PASS,7.14
+T15,Voice + Gesture: Modality Conflict,inspect,cup,MODALITY_CONFLICT,MODALITY_CONFLICT,,SAFE,INSPECT,PASS,7.64
+T16,Human intervention required (medium risk),pick,knife,VALID,VALID,SAFE,SAFE,MOVE_FORWARD,PASS,6.84
+T17,Vision + Gesture without Voice,none,,VALID,VALID,,SAFE,STOP,PASS,6.52
+T18,Voice + Vision + Gesture: Perfect agreement,inspect,box,VALID,VALID,SAFE,SAFE,STOP,PASS,7.54
+T19,Unsafe distance (Human too close),move_forward,,VALID,VALID,SAFE,SAFE,MOVE_FORWARD,PASS,5.74
+T20,Sensor validity failed,move_forward,,VALID,VALID,SAFE,SAFE,MOVE_FORWARD,PASS,6.09
+T21,Stop command overrides everything,stop,,VALID,VALID,SAFE,SAFE,STOP,PASS,5.87

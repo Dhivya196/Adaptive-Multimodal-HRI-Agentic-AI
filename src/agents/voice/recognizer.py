@@ -108,17 +108,20 @@ class WhisperSpeechRecognizer(BaseSpeechRecognizer):
         if self._model is not None:
             try:
                 import whisper
+                import time
 
                 # Ensure 16kHz float32
                 audio_float = audio.astype(np.float32)
+                t_whisper_start = time.perf_counter()
                 result = self._model.transcribe(
                     audio_float,
                     language=language if language != "auto" else None,
                     temperature=self.temperature,
                     fp16=False,
                     condition_on_previous_text=False,
-                    initial_prompt="Human-robot interaction commands: pick up the bottle, stop, navigate, move, go.",
+                    initial_prompt="HRI commands: pick, place, stop, move, go, bottle, cup, laptop, phone, left, right.",
                 )
+                whisper_time_ms = (time.perf_counter() - t_whisper_start) * 1000.0
 
                 transcript = result.get("text", "").strip()
                 raw_segments = result.get("segments", [])
@@ -144,6 +147,7 @@ class WhisperSpeechRecognizer(BaseSpeechRecognizer):
                     "confidence": min(1.0, max(0.0, avg_conf)),
                     "segments": segments,
                     "language": result.get("language", language),
+                    "inference_time_ms": whisper_time_ms,
                 }
             except Exception as e:
                 self.logger.error(f"Error during Whisper transcription: {e}")

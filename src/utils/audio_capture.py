@@ -19,7 +19,7 @@ class MicrophoneRecorder:
         sample_rate: int = 16000,
         chunk_duration: float = 0.1,
         energy_threshold: float = 0.015,
-        silence_duration: float = 0.8,
+        silence_duration: float = 0.6,
         max_duration: float = 6.0,
         min_duration: float = 0.4,
         device: Optional[Union[int, str]] = None,
@@ -34,6 +34,7 @@ class MicrophoneRecorder:
         self.device = device
         self.debug = debug
         self.last_stop_reason = "none"
+        self.last_timings = {}
         self.logger = get_logger("MicrophoneRecorder")
         self._sounddevice = None
         self._check_driver()
@@ -217,6 +218,7 @@ class MicrophoneRecorder:
                             self.last_stop_reason = "maximum duration reached"
                             break
 
+            finish_time = time.time()
             if buffer:
                 audio_array = np.concatenate(buffer, axis=0).astype(np.float32)
                 # Remove DC bias from the concatenated phrase
@@ -224,8 +226,25 @@ class MicrophoneRecorder:
                 max_val = np.max(np.abs(audio_array))
                 if max_val > 1.0:
                     audio_array = audio_array / max_val
+                
+                rec_dur = float(len(audio_array) / self.sample_rate)
+                self.last_timings = {
+                    "recording_start_time": start_time,
+                    "speech_detected_time": recording_start_time or start_time,
+                    "recording_finished_time": finish_time,
+                    "recording_duration_sec": rec_dur,
+                    "total_listen_time_sec": finish_time - start_time,
+                }
                 return audio_array
-            return None
+            else:
+                self.last_timings = {
+                    "recording_start_time": start_time,
+                    "speech_detected_time": None,
+                    "recording_finished_time": finish_time,
+                    "recording_duration_sec": 0.0,
+                    "total_listen_time_sec": finish_time - start_time,
+                }
+                return None
 
         except Exception as e:
             self.logger.error(f"Error recording from microphone: {e}")

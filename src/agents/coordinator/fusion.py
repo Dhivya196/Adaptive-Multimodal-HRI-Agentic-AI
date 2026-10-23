@@ -822,10 +822,17 @@ class MultimodalFusionEngine:
                 else:
                     matched_obj = max(candidates, key=lambda o: o.confidence)
 
-        # Referential pronoun with no gesture
+        # Referential pronoun with no pointing gesture -> Delegate to MemoryAgent for historical resolution
         if is_referential:
             fused_conf = (self.voice_weight * voice_conf) + (self.vision_weight * vision_output.confidence)
             detected_objs = vision_output.detected_objects or []
+
+            spatial = None
+            if intent.spatial_sector:
+                try:
+                    spatial = SpatialSector(intent.spatial_sector.upper())
+                except ValueError:
+                    spatial = SpatialSector.UNKNOWN
 
             if len(detected_objs) > 1:
                 # Ambiguous deictic target without gesture pointing to resolve it
@@ -834,6 +841,7 @@ class MultimodalFusionEngine:
                     target_object=target_name or "it",
                     target_confirmed=False,
                     target_confidence=vision_output.confidence,
+                    spatial_sector=spatial,
                     urgency=intent.urgency,
                     confidence=fused_conf * 0.6,
                     grounding_status=GroundingStatus.AMBIGUOUS,
@@ -841,41 +849,25 @@ class MultimodalFusionEngine:
                     task_status=TaskStatus.AMBIGUOUS_TARGET,
                     reasoning=f"Referential target '{target_name or 'it'}' is ambiguous with {len(detected_objs)} visual candidates and no pointing gesture.",
                     modality_contributions={"voice": voice_conf, "vision": vision_output.confidence},
-                    metadata={"ambiguous_candidates": [o.label for o in detected_objs]},
-                )
-            elif len(detected_objs) == 1:
-                single_obj = detected_objs[0]
-                return MultimodalTask(
-                    action=action,
-                    target_object=single_obj.label,
-                    target_confirmed=True,
-                    target_confidence=single_obj.confidence,
-                    spatial_sector=single_obj.spatial_sector,
-                    proximity=single_obj.proximity,
-                    urgency=intent.urgency,
-                    confidence=fused_conf,
-                    grounding_status=(
-                        GroundingStatus.HIGH_CONFIDENCE
-                        if single_obj.confidence >= self.high_confidence_threshold
-                        else GroundingStatus.LOW_CONFIDENCE
-                    ),
-                    task_status=TaskStatus.VALID,
-                    matched_visual_object=single_obj,
-                    reasoning=f"Referential target '{target_name or 'it'}' resolved to sole visual object '{single_obj.label}'.",
-                    modality_contributions={"voice": voice_conf, "vision": single_obj.confidence},
+                    metadata={"ambiguous_candidates": [o.label for o in detected_objs], "voice_reference": target_name or "it", "requires_memory": True},
                 )
             else:
                 return MultimodalTask(
                     action=action,
                     target_object=target_name or "it",
                     target_confirmed=False,
+                    spatial_sector=spatial,
                     urgency=intent.urgency,
                     confidence=fused_conf,
                     grounding_status=GroundingStatus.UNRESOLVED,
-                    task_status=TaskStatus.TARGET_NOT_FOUND,
-                    reasoning=f"Referential target '{target_name}' passed to MemoryAgent for cross-turn context resolution.",
+                    referential_grounding_status=GroundingStatus.UNRESOLVED.value,
+                    task_status=TaskStatus.TARGET_NOT_FOUND if len(detected_objs) == 0 else TaskStatus.AMBIGUOUS_TARGET,
+                    reasoning=f"Referential target '{target_name or 'it'}' has no pointing gesture in current turn; requires historical context.",
                     modality_contributions={"voice": voice_conf, "vision": vision_output.confidence},
+                    metadata={"voice_reference": target_name or "it", "requires_memory": True},
                 )
+
+
 
         # Target requested by voice was NOT found in vision
         if target_name and matched_obj is None:

@@ -99,3 +99,18 @@ def test_voice_agent_real_wav_dataset(mock_voice_agent):
 def test_voice_agent_invalid_input_type(mock_voice_agent):
     with pytest.raises(PerceptionError):
         mock_voice_agent.process(12345)
+
+
+def test_voice_agent_latency_metrics(mock_voice_agent):
+    tone = generate_synthetic_tone(freq_hz=440.0, duration_sec=1.0, amplitude=0.5)
+    inp = VoiceAgentInput(audio_data=tone, sample_rate=16000)
+    output: VoiceAgentOutput = mock_voice_agent.process(inp)
+
+    assert output.success is True
+    assert output.recording_duration == 1.0
+    assert output.audio_preprocessing_latency >= 0.0
+    assert output.whisper_latency >= 0.0
+    assert output.intent_extraction_latency >= 0.0
+    assert output.total_voice_processing_latency >= 0.0
+    assert "audio_preprocessing_ms" in output.timing_metrics
+

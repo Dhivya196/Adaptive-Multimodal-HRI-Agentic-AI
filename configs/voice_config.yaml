@@ -11,6 +11,7 @@ voice:
 audio:
   chunk_duration_sec: 2.0           # Audio buffer chunk duration for continuous listening
   channels: 1                       # Mono channel
+  silence_duration_sec: 0.6         # Silence duration threshold (seconds) for speech endpointing
   record_seconds: 3.0               # Recording duration for single command capture
 
 intent_extraction:

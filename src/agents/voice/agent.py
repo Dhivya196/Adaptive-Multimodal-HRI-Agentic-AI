@@ -2,6 +2,7 @@
 
 import os
 import re
+import time
 from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 
@@ -177,6 +178,15 @@ class VoiceAgent(BaseAgent):
                 detected_keywords.append(obj)
                 break
 
+        # If no explicit concrete object matched, check for referential pronouns
+        if target_object is None:
+            PRONOUN_KEYWORDS = ["the object", "the item", "this", "that", "them", "it", "one"]
+            for pron in PRONOUN_KEYWORDS:
+                if re.search(r"\b" + re.escape(pron) + r"\b", normalized):
+                    target_object = pron
+                    detected_keywords.append(pron)
+                    break
+
         # Confidence calculation
         intent_conf = base_confidence
         if action != "unknown":
@@ -269,6 +279,7 @@ class VoiceAgent(BaseAgent):
         # ---------------------------------------------------------
         # 3. Audio Validation, Filtering & VAD
         # ---------------------------------------------------------
+        t_proc_start = time.perf_counter()
         if audio_array is None or len(audio_array) == 0:
             return VoiceAgentOutput(
                 agent_name=self.name,
@@ -286,6 +297,7 @@ class VoiceAgent(BaseAgent):
                 confidence=0.0,
             )
 
+        t_prep_start = time.perf_counter()
         # Remove DC bias & low-frequency noise (e.g. 80Hz rumble)
         audio_array = filter_audio_dc_and_rumble(audio_array, fs=sample_rate)
         # Normalize peak amplitude safely if non-silent
@@ -297,8 +309,11 @@ class VoiceAgent(BaseAgent):
         rms_energy = calculate_rms_energy(audio_array)
         duration_sec = float(len(audio_array) / sample_rate)
         speech_active = is_voice_active(audio_array, energy_threshold=self._energy_threshold)
+        t_prep_end = time.perf_counter()
+        prep_latency_ms = (t_prep_end - t_prep_start) * 1000.0
 
         if not speech_active:
+            total_proc_ms = (time.perf_counter() - t_proc_start) * 1000.0
             return VoiceAgentOutput(
                 agent_name=self.name,
                 agent_type=self.agent_type.value,
@@ -313,6 +328,18 @@ class VoiceAgent(BaseAgent):
                 rms_energy=rms_energy,
                 language=language,
                 confidence=0.0,
+                recording_duration=duration_sec,
+                audio_preprocessing_latency=prep_latency_ms,
+                whisper_latency=0.0,
+                intent_extraction_latency=0.0,
+                total_voice_processing_latency=total_proc_ms,
+                timing_metrics={
+                    "recording_duration_s": duration_sec,
+                    "audio_preprocessing_ms": prep_latency_ms,
+                    "whisper_inference_ms": 0.0,
+                    "intent_extraction_ms": 0.0,
+                    "total_voice_processing_ms": total_proc_ms,
+                },
             )
 
         # ---------------------------------------------------------
@@ -322,15 +349,25 @@ class VoiceAgent(BaseAgent):
             self._initialize()
 
         assert self.recognizer is not None
+        t_asr_start = time.perf_counter()
         asr_result = self.recognizer.transcribe(audio_array, sample_rate=sample_rate, language=language)
+        t_asr_end = time.perf_counter()
+        whisper_latency_ms = asr_result.get("inference_time_ms", (t_asr_end - t_asr_start) * 1000.0)
 
         transcript = asr_result.get("transcript", "").strip()
         confidence = float(asr_result.get("confidence", 0.0))
         segments = asr_result.get("segments", [])
         lang = asr_result.get("language", language)
 
+        # ---------------------------------------------------------
+        # 5. Extract Intent & Linguistic Entities
+        # ---------------------------------------------------------
+        t_intent_start = time.perf_counter()
         normalized = self.normalize_text(transcript)
         speech_intent, keywords = self.extract_intent(transcript, base_confidence=confidence)
+        t_intent_end = time.perf_counter()
+        intent_latency_ms = (t_intent_end - t_intent_start) * 1000.0
+        total_proc_ms = (time.perf_counter() - t_proc_start) * 1000.0
 
         return VoiceAgentOutput(
             agent_name=self.name,
@@ -346,6 +383,18 @@ class VoiceAgent(BaseAgent):
             rms_energy=rms_energy,
             language=lang,
             confidence=confidence,
+            recording_duration=duration_sec,
+            audio_preprocessing_latency=prep_latency_ms,
+            whisper_latency=whisper_latency_ms,
+            intent_extraction_latency=intent_latency_ms,
+            total_voice_processing_latency=total_proc_ms,
+            timing_metrics={
+                "recording_duration_s": duration_sec,
+                "audio_preprocessing_ms": prep_latency_ms,
+                "whisper_inference_ms": whisper_latency_ms,
+                "intent_extraction_ms": intent_latency_ms,
+                "total_voice_processing_ms": total_proc_ms,
+            },
         )
 
     def _reset(self) -> None:
